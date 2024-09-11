@@ -7,6 +7,9 @@ class GeoService {
                 params: {
                     q: query,
                     format: 'json'
+                },
+                headers: {
+                    'User-Agent': 'TalkMap/1.0 (m0skvitin@mail.ru)' 
                 }
             });
 
