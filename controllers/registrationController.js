@@ -1,4 +1,4 @@
-const RegistrationService = require('../services/RegistrationService');
+const RegistrationService = require('../services/registrationService');
 const MailService = require('../services/mailService');
 const GeoService = require('../services/geoService');
 
