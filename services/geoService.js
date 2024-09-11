@@ -1,0 +1,25 @@
+const axios = require("axios");
+
+class GeoService {
+    async getCitiesByTxt (query) {
+        try{
+            const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+                params: {
+                    q: query,
+                    format: 'json'
+                }
+            });
+
+            return response.data.map((item) => ({
+                name: item.display_name,
+                lat: parseFloat(item.lat),
+                lon: parseFloat(item.lon)
+            }))
+        }catch(err){
+            console.error(err);
+            throw err;
+        }
+    }
+}
+
+module.exports = new GeoService();

@@ -1,5 +1,6 @@
 const RegistrationService = require('../services/RegistrationService');
 const MailService = require('../services/mailService');
+const GeoService = require('../services/geoService');
 
 class RegistrationController {
 
@@ -55,6 +56,30 @@ class RegistrationController {
         }catch (err) {
             console.error(err);
             return res.status(500).json({error: 'Ошибка при проверке кода'});
+        }
+    }
+
+    async getCities(req, res){
+        const { query } = req.body;
+
+        if (!query) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const cities = await GeoService.getCitiesByTxt(query)
+            res.status(200).json({ cities: cities });
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при получении адресов'});
+        }
+    }
+
+    async getCommonAvatars(req, res){
+        try{
+            const avatars = await RegistrationService.getAvatars()
+            res.status(200).json({avatars: avatars});
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при получении аватарок'});
         }
     }
 }

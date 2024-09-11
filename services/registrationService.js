@@ -1,5 +1,5 @@
 const User = require("../models/userModel");
-
+const CommonAvatar = require("../models/commonAvatarModel");
 class RegistrationService {
 
     // проверяем занят ли емаил
@@ -13,6 +13,15 @@ class RegistrationService {
         }
     }
 
+    async getAvatars(){
+        try {
+            const avatars = await CommonAvatar.find({}, { img_url: 1, _id: 0 });
+            return avatars.map(avatar => avatar.img_url);
+        }catch(err){
+            console.error("Ошибка при получение готовых аватарок");
+            throw err;
+        }
+    }
 
 }
 
