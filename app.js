@@ -30,7 +30,7 @@ mongoose
 
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, 'localhost', (e) => {
+server.listen(PORT,  '0.0.0.0',(e) => {
     e ? console.error(e.message) : console.log(`Работает на http://localhost:${process.env.PORT}`)
 })
 
