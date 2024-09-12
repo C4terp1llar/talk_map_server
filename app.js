@@ -19,7 +19,12 @@ server.use(cors({
 server.use(session({
     secret: 'secret-key',
     resave: false,
-    saveUninitialized: true
+    saveUninitialized: true,
+    cookie: {
+        secure: true,
+        httpOnly: true,
+        sameSite: 'none'
+    }
 }));
 server.use('/api', registrationRoutes)
 
