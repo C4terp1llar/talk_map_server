@@ -23,6 +23,8 @@ server.use(session({
     cookie: {
         secure: true,
         sameSite: 'none',
+        domain: 'talkmapserver-production.up.railway.app',
+        path: '/'
     }
 }));
 server.use('/api', registrationRoutes)
