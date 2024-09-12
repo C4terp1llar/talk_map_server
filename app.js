@@ -11,7 +11,9 @@ const server = express();
 
 server.use(express.json());
 server.use(cors({
-    origin: '*', 
+    origin: '*',
+    credentials: true,
+    withCredentials: true
 }));
 server.use(session({
     secret: 'secret-key',
