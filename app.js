@@ -11,7 +11,7 @@ const server = express();
 
 server.use(express.json());
 server.use(cors({
-    origin: 'http://localhost:5173',
+    origin: 'https://localhost:5173',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
     allowedHeaders: 'Content-Type, Authorization, X-Requested-With'
@@ -21,9 +21,9 @@ server.use(session({
     resave: false,
     saveUninitialized: true,
     cookie: {
-        secure: false,
+        secure: true,
         httpOnly: true,
-        sameSite: 'strict',
+        sameSite: 'None',
     }
 }));
 server.use('/api', registrationRoutes)
