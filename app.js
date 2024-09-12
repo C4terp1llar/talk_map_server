@@ -13,14 +13,18 @@ server.use(express.json());
 server.use(cors({
     origin: 'http://localhost:5173',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,  
+    credentials: true,
     allowedHeaders: 'Content-Type, Authorization'
 }));
 server.use(session({
     secret: 'secret-key',
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false}
+    cookie: {
+        secure: true,
+        httpOnly: true,
+        sameSite: 'None'
+    }
 }));
 server.use('/api', registrationRoutes)
 
