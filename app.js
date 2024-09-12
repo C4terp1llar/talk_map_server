@@ -20,12 +20,12 @@ server.use(session({
     secret: 'secret-key',
     resave: false,
     saveUninitialized: true,
-    cookie: {
-        secure: true,
-        sameSite: 'lax',
-        httpOnly: true,
-
-    }
+    // cookie: {
+    //     secure: true,
+    //     sameSite: 'lax',
+    //     httpOnly: true,
+    //
+    // }
 }));
 server.use('/api', registrationRoutes)
 
