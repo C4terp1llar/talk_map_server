@@ -30,7 +30,7 @@ class RegistrationController {
         req.session.email = email;
 
 
-        console.log(req.session.verificationCode = code, req.session.email = email)
+        console.log(req.session.verificationCode, req.session.email)
         try{
             await MailService.sendRegCode(email, code);
             return res.status(200).json({ message: 'Код успешно отправлен' });
@@ -50,8 +50,8 @@ class RegistrationController {
             const storedCode = req.session.verificationCode;
             const storedEmail = req.session.email;
 
-            console.log(req.session.verificationCode = code, req.session.email = email)
-            
+            console.log(storedCode, storedEmail, code)
+
 
             if (storedCode === Number(code)) {
                 res.status(200).json({ message: `Емаил ${storedEmail} успешно верифицирован` });
