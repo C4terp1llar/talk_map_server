@@ -23,7 +23,7 @@ server.use(session({
     cookie: {
         secure: true,
         httpOnly: true,
-        sameSite: 'None',
+
     }
 }));
 server.use('/api', registrationRoutes)
