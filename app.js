@@ -10,20 +10,20 @@ const registrationRoutes = require('./routes/registrationRoutes');
 const server = express();
 
 server.use(express.json());
-server.use(cors({
-    origin: 'http://localhost:5173',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
-    allowedHeaders: 'Content-Type, Authorization'
-}));
+// server.use(cors({
+//     origin: 'http://localhost:5173',
+//     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+//     credentials: true,
+//     allowedHeaders: 'Content-Type, Authorization'
+// }));
 server.use(session({
     secret: 'secret-key',
     resave: false,
     saveUninitialized: true,
     cookie: {
-        secure: false,
+        secure: true,
         httpOnly: true,
-
+        sameSite: 'none',
     }
 }));
 server.use('/api', registrationRoutes)
