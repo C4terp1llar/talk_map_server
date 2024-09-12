@@ -11,9 +11,9 @@ const server = express();
 
 server.use(express.json());
 server.use(cors({
-    origin: 'http://localhost:5173',
+    origin: (origin, callback) => callback(null, true), // Разрешаем все домены
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
+    credentials: true, // Необходимо для отправки куков
     allowedHeaders: 'Content-Type, Authorization, X-Requested-With'
 }));
 server.use(session({
