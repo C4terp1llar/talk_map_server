@@ -22,8 +22,9 @@ server.use(session({
     saveUninitialized: true,
     cookie: {
         secure: true,
-        sameSite: 'none',
+        sameSite: 'lax',
         httpOnly: true,
+
     }
 }));
 server.use('/api', registrationRoutes)
