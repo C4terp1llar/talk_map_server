@@ -29,7 +29,11 @@ server.use(session({
     secret: 'secret-key',
     resave: false,
     saveUninitialized: true,
-
+    cookie: {
+        secure: true,
+        sameSite: 'none',
+        httpOnly: true,
+    }
 }));
 server.use('/api', registrationRoutes)
 
