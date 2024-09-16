@@ -35,6 +35,10 @@ server.use(session({
         httpOnly: true,
     }
 }));
+server.use((req, res, next) => {
+    res.header('Access-Control-Allow-Credentials', 'true');
+    next();
+});
 server.use('/api', registrationRoutes)
 
 mongoose
