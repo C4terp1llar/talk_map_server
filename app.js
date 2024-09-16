@@ -9,9 +9,20 @@ const registrationRoutes = require('./routes/registrationRoutes');
 
 const server = express();
 
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://talkmap.netlify.app',
+];
+
 server.use(express.json());
 server.use(cors({
-    origin: 'http://localhost:5173',  // Адрес вашего фронтенда
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        } else {
+            return callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 server.use(session({
