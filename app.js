@@ -11,22 +11,14 @@ const server = express();
 
 server.use(express.json());
 server.use(cors({
-    origin: (origin, callback) => callback(null, true), // Разрешаем все домены
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true, // Необходимо для отправки куков
-    allowedHeaders: 'Content-Type, Authorization, X-Requested-With'
+    origin: 'http://localhost:5173',  // Адрес вашего фронтенда
+    credentials: true
 }));
 server.use(session({
     secret: 'secret-key',
     resave: false,
     saveUninitialized: true,
-    cookie: {
-        secure: true,
-        sameSite: 'None',
-        httpOnly: true,
-        maxAge: 60000 * 24 * 60 * 60 * 1000,
-        path: '/',
-    }
+
 }));
 server.use('/api', registrationRoutes)
 
