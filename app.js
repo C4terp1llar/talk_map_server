@@ -30,8 +30,8 @@ server.use(session({
     resave: false,
     saveUninitialized: true,
     cookie: {
-        secure: false,
-        sameSite: 'lax',
+        secure: true,
+        sameSite: 'None',
         httpOnly: true,
     }
 }));
