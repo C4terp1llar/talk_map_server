@@ -1,6 +1,7 @@
 const RegistrationService = require('../services/registrationService');
 const MailService = require('../services/mailService');
 const GeoService = require('../services/geoService');
+const JwtService = require('../services/jwtService');
 
 class RegistrationController {
 
@@ -25,14 +26,18 @@ class RegistrationController {
 
         const code = Math.floor(1000 + Math.random() * 9000);
 
-        // Сохранение кода в сессии
-        req.session.verificationCode = code;
-        req.session.email = email;
+        const token = JwtService.createToken({email: email, verifyCode: code})
 
-
-        console.log(req.session.verificationCode, req.session.email)
+        console.log(email, code)
         try{
             await MailService.sendRegCode(email, code);
+
+            res.cookie('sessionID', token, {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'None',
+            });
+
             return res.status(200).json({ message: 'Код успешно отправлен' });
         }catch(err){
             console.error(err);
@@ -42,19 +47,17 @@ class RegistrationController {
 
     async verifyCheckCode(req, res){
         const { code } = req.body;
+        const token = req.cookies.sessionID;
 
-        if (!code) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+        if (!code || !token) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
         try {
-            // достаем из сессии
-            const storedCode = req.session.verificationCode;
-            const storedEmail = req.session.email;
+            const { email, verifyCode } = JwtService.verifyToken(token);
 
-            console.log(storedCode, storedEmail, code)
+            console.log(email, verifyCode, code)
 
-
-            if (storedCode === Number(code)) {
-                res.status(200).json({ message: `Емаил ${storedEmail} успешно верифицирован` });
+            if (verifyCode  === Number(code)) {
+                res.status(200).json({ message: `Емаил ${email} успешно верифицирован` });
             } else {
                 res.status(400).json({ message: 'Неверный код' });
             }

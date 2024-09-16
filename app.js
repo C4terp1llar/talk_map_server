@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const session = require('express-session');
+const cookieParser = require('cookie-parser');
 
 const registrationRoutes = require('./routes/registrationRoutes');
 
@@ -15,6 +15,7 @@ const allowedOrigins = [
 ];
 
 server.use(express.json());
+server.use(cookieParser())
 server.use(cors({
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin)) {
@@ -25,20 +26,6 @@ server.use(cors({
     },
     credentials: true
 }));
-server.use(session({
-    secret: 'secret-key',
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-        secure: true,
-        sameSite: 'None',
-        httpOnly: true,
-    }
-}));
-server.use((req, res, next) => {
-    res.header('Access-Control-Allow-Credentials', 'true');
-    next();
-});
 server.use('/api', registrationRoutes)
 
 mongoose
