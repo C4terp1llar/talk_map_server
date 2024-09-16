@@ -73,8 +73,8 @@ class RegistrationController {
         if (!query) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
         try{
-            const cities = await GeoService.getCitiesByTxt(query)
-            res.status(200).json({ cities: cities });
+            const response = await GeoService.getCitiesByTxt(query)
+            res.status(200).json(response);
         }catch (err) {
             console.error(err);
             return res.status(500).json({error: 'Ошибка при получении адресов'});
@@ -84,7 +84,7 @@ class RegistrationController {
     async getCommonAvatars(req, res){
         try{
             const avatars = await RegistrationService.getAvatars()
-            res.status(200).json({avatars: avatars});
+            res.status(200).json(avatars);
         }catch (err) {
             console.error(err);
             return res.status(500).json({error: 'Ошибка при получении аватарок'});

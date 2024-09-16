@@ -13,11 +13,16 @@ class GeoService {
                 }
             });
 
+            if (!response.data.length){
+                return {message: 'По данному запросу ничего не найдено'};
+            }
+
             return response.data.map((item) => ({
                 name: item.display_name,
                 lat: parseFloat(item.lat),
                 lon: parseFloat(item.lon)
             }))
+
         }catch(err){
             console.error(err);
             throw err;
