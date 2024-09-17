@@ -1,12 +1,16 @@
 const User = require("../models/userModel");
+const Address = require("../models/addressModel");
+const Token = require("../models/tokenModel");
 const CommonAvatar = require("../models/commonAvatarModel");
+
 class RegistrationService {
 
     // проверяем занят ли емаил
     async isEmailTaken(email){
         try {
-            const user = User.findOne({email: email});
-            return user === null;
+            const user = await User.findOne({email: email});
+
+            return user !== null;
         }catch(err){
             console.error("Ошибка при проверке емаила");
             throw err;
@@ -23,6 +27,60 @@ class RegistrationService {
         }
     }
 
+    async registerUser(email, password, nickname, b_date, gender, avatar){
+        try {
+            console.log(avatar)
+
+            const newUser = new User({
+                email: email,
+                password: password,
+                nickname: nickname,
+                b_date: b_date,
+                gender: gender,
+                avatar: avatar
+            });
+
+            const {_id} = await newUser.save();
+
+            return _id
+
+        } catch(err){
+            console.error("Ошибка при создании юзера");
+            throw err;
+        }
+    }
+
+    async createAddress(uid, {lat, lon, name}) {
+        try {
+            const newAddress = new Address({
+                user_id: uid,
+                lat,
+                lon,
+                address: name
+            });
+
+            await newAddress.save();
+        } catch (err) {
+            console.error("Ошибка при создании адреса");
+            throw err;
+        }
+    }
+
+    async saveRefreshToken(uid, token, device) {
+        try {
+            const newToken = new Token({
+                user_id: uid,
+                token,
+                device
+            });
+
+            await newToken.save();
+
+        } catch (err) {
+            console.error("Ошибка при сохранении токена");
+            throw err;
+        }
+    }
 }
 
 module.exports = new RegistrationService();

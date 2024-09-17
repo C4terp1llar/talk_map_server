@@ -2,6 +2,9 @@ const RegistrationService = require('../services/registrationService');
 const MailService = require('../services/mailService');
 const GeoService = require('../services/geoService');
 const JwtService = require('../services/jwtService');
+const ImgService = require('../services/imgService');
+
+const bcrypt = require('bcrypt');
 
 class RegistrationController {
 
@@ -26,13 +29,13 @@ class RegistrationController {
 
         const code = Math.floor(1000 + Math.random() * 9000);
 
-        const token = JwtService.createToken({email: email, verifyCode: code})
+        const token = JwtService.createSessionToken({email: email, verifyCode: code})
 
         console.log(email, code)
         try{
             await MailService.sendRegCode(email, code);
 
-            res.cookie('sessionID', token, {
+            res.cookie('sessionId', token, {
                 httpOnly: true,
                 secure: true,
                 sameSite: 'None',
@@ -47,12 +50,12 @@ class RegistrationController {
 
     async verifyCheckCode(req, res){
         const { code } = req.body;
-        const token = req.cookies.sessionID;
+        const token = req.cookies.sessionId;
 
         if (!code || !token) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
         try {
-            const { email, verifyCode } = JwtService.verifyToken(token);
+            const { email, verifyCode } = JwtService.verifySessionToken(token);
 
             console.log(email, verifyCode, code)
 
@@ -88,6 +91,50 @@ class RegistrationController {
         }catch (err) {
             console.error(err);
             return res.status(500).json({error: 'Ошибка при получении аватарок'});
+        }
+    }
+
+    async registerUser(req, res){
+        const {email, password, nickname, date_b, gender, avatar, address, device_info} = req.body;
+
+        if (!email || !password || !nickname || !date_b || !gender || !avatar || !address || !device_info) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const userBDate = new Date(date_b)
+
+            const userGender = gender === 'Мужской' ? 'male' : 'female';
+
+            const userPassword = await bcrypt.hash(password, 5);
+
+            const userAvatar = await ImgService.uploadImg(avatar)
+
+            console.log(userAvatar)
+
+            const uid = await RegistrationService.registerUser(email, userPassword, nickname, userBDate, userGender, userAvatar)
+
+            await RegistrationService.createAddress(uid, address) // адресс валид на фронте и содержит lat + lon + address (текст адреса)
+
+            const accessToken = JwtService.createAccessToken({ uid, email });
+            const refreshToken = JwtService.createRefreshToken({ uid, email });
+
+            await RegistrationService.saveRefreshToken(uid, refreshToken, device_info)
+
+            res.cookie('access_token', accessToken, {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'None',
+            })
+
+            res.cookie('refresh_token', refreshToken, {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'None',
+            })
+
+            res.status(201).json({message: 'Пользователь успешно зарегистрирован'})
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при регистрации аккаунта'});
         }
     }
 }

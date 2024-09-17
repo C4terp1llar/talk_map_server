@@ -14,7 +14,8 @@ const allowedOrigins = [
     'https://talkmap.netlify.app',
 ];
 
-server.use(express.json());
+server.use(express.json({ limit: '10mb' }));
+server.use(express.urlencoded({ limit: '10mb', extended: true }));
 server.use(cookieParser())
 server.use(cors({
     origin: (origin, callback) => {
