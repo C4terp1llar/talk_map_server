@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const Token = require('../models/tokenModel');
 
 class JwtService {
     constructor() {
@@ -7,7 +8,7 @@ class JwtService {
         this.sessionTokenSecret = process.env.JWT_SESSION_SECRET;
     }
 
-    createAccessToken(payload, expiresIn = '15m') {
+    createAccessToken(payload, expiresIn = '15s') {
         return jwt.sign(payload, this.accessTokenSecret, { expiresIn });
     }
 
@@ -29,6 +30,53 @@ class JwtService {
 
     verifySessionToken(token) {
         return jwt.verify(token, this.sessionTokenSecret);
+    }
+
+    async clearExpiredTokens(userId) {
+        const expirationPeriod = 15 * 24 * 60 * 60 * 1000; // 15 дней
+
+        const expirationDate = new Date(Date.now() - expirationPeriod);
+
+        try {
+            await Token.deleteMany({
+                user_id: userId,
+                created: { $lt: expirationDate }
+            });
+
+        } catch (err) {
+            console.error("Ошибка при удалении истекших токенов");
+            throw err;
+        }
+    }
+
+    async getRefreshTokenByDevice(userId, device) {
+        try {
+            const tokenSnapshot = await Token.findOne({
+                user_id: userId,
+                device: device
+            });
+
+            if (tokenSnapshot && tokenSnapshot.token) {
+                return tokenSnapshot.token;
+            } else {
+                return null;
+            }
+        } catch (err) {
+            console.error('Ошибка при поиске токена по устройству');
+            throw err;
+        }
+    }
+
+    async deleteRefreshToken(userId, device) {
+        try {
+            await Token.deleteOne({
+                user_id: userId,
+                device: device
+            });
+        } catch (err) {
+            console.error('Ошибка при удалении рефреш токена');
+            throw err;
+        }
     }
 }
 

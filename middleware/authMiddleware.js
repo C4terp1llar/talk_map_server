@@ -1,22 +1,20 @@
 const JwtService = require('../services/jwtService');
 
 const authMiddleware = async (req, res, next) => {
+    const accessToken = req.headers['authorization']?.split(' ')[1];
+
+    if (!accessToken) {
+        return res.status(401).json({ error: 'Необходима авторизация' });
+    }
+
     try {
-        const token = req.cookies.access_token;
-
-        if (!token) {
-            return res.status(401).json({ error: 'Необходима авторизация' });
-        }
-
-        req.user = JwtService.verifyAccessToken(token);// пробуем доставть uid и маил юзера
-
-        next();
+        req.user = JwtService.verifyAccessToken(accessToken);
+        return next();
     } catch (err) {
         if (err.name === 'TokenExpiredError') {
-            return res.status(401).json({ error: 'Токен истек', message: 'refresh' });
+            return res.status(401).json({ error: 'Токен истек' });
         } else {
-            console.error(err);
-            return res.status(401).json({ error: 'Неверный токен', message: 'auth' });
+            return res.status(403).json({ error: 'Неверный токен' });
         }
     }
 };

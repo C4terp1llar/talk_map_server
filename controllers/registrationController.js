@@ -114,16 +114,10 @@ class RegistrationController {
 
             await RegistrationService.createAddress(uid, address) // адресс валид на фронте и содержит lat + lon + address (текст адреса)
 
-            const accessToken = JwtService.createAccessToken({ uid, email });
-            const refreshToken = JwtService.createRefreshToken({ uid, email });
+            const accessToken = JwtService.createAccessToken({ uid, email, device_info });
+            const refreshToken = JwtService.createRefreshToken({ uid, email, device_info });
 
             await RegistrationService.saveRefreshToken(uid, refreshToken, device_info)
-
-            res.cookie('access_token', accessToken, {
-                httpOnly: true,
-                secure: true,
-                sameSite: 'None',
-            })
 
             res.cookie('refresh_token', refreshToken, {
                 httpOnly: true,
@@ -131,7 +125,7 @@ class RegistrationController {
                 sameSite: 'None',
             })
 
-            res.status(201).json({message: 'Пользователь успешно зарегистрирован'})
+            res.status(201).json({message: 'Пользователь зарегистрирован', accessToken: accessToken})
         }catch (err) {
             console.error(err);
             return res.status(500).json({error: 'Ошибка при регистрации аккаунта'});

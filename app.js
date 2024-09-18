@@ -6,6 +6,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
 const registrationRoutes = require('./routes/registrationRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const server = express();
 
@@ -27,7 +28,8 @@ server.use(cors({
     },
     credentials: true
 }));
-server.use('/api', registrationRoutes)
+server.use('/api/reg', registrationRoutes);
+server.use('/api/auth', authRoutes);
 
 mongoose
     .connect(process.env.MONGO_URL)
