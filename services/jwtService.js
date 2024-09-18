@@ -8,7 +8,7 @@ class JwtService {
         this.sessionTokenSecret = process.env.JWT_SESSION_SECRET;
     }
 
-    createAccessToken(payload, expiresIn = '15s') {
+    createAccessToken(payload, expiresIn = '15m') {
         return jwt.sign(payload, this.accessTokenSecret, { expiresIn });
     }
 
