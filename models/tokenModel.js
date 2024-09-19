@@ -17,6 +17,14 @@ const TokenSchema = new mongoose.Schema({
     created: {
         type: Date,
         default: Date.now
+    },
+    max_activation_count: {
+        type: Number,
+        default: 1
+    },
+    disable: {
+        type: Boolean,
+        default: false
     }
 });
 

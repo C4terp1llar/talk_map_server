@@ -3,6 +3,7 @@ const MailService = require('../services/mailService');
 const GeoService = require('../services/geoService');
 const JwtService = require('../services/jwtService');
 const ImgService = require('../services/imgService');
+const AuthService = require('../services/authService');
 
 const bcrypt = require('bcrypt');
 
@@ -23,9 +24,9 @@ class RegistrationController {
     }
 
     async sendCheckCode(req, res){
-        const { email } = req.body;
+        const { email, type } = req.body;
 
-        if (!email) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+        if (!email || !type || !(type !== 'registration' || type !== 'recovery')) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
         const code = Math.floor(1000 + Math.random() * 9000);
 
@@ -33,7 +34,12 @@ class RegistrationController {
 
         console.log(email, code)
         try{
-            await MailService.sendRegCode(email, code);
+
+            if (type === 'recovery') {
+                await MailService.sendRecoveryCode(email, code);
+            }else{
+                await MailService.sendRegCode(email, code);
+            }
 
             res.cookie('sessionId', token, {
                 httpOnly: true,
@@ -69,6 +75,34 @@ class RegistrationController {
             return res.status(500).json({error: 'Ошибка при проверке кода'});
         }
     }
+
+    // для рекавери
+
+    async changeUserPassword (req, res) {
+        const { email, password } = req.body;
+
+        if (!email || !password) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const user = await AuthService.getUser(email)
+
+            const match = await bcrypt.compare(password, user.password);
+
+            if (match){
+                return res.status(200).json({message: 'Пароли совпадают', passChangeNeed: false});
+            }
+
+            const newUserPassword = await bcrypt.hash(password, 5);
+
+            await RegistrationService.changeUserPassword(email, newUserPassword);
+
+            res.status(200).json({ message: `Пароль пользователя с ${email} успешно изменен` , passChangeNeed: true});
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при изменении пароля'});
+        }
+    }
+    //
 
     async getCities(req, res){
         const { query } = req.body;

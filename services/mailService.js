@@ -1,5 +1,5 @@
 const nodemailer = require("nodemailer");
-const { getRegistrationEmailTemplate } = require("../templates/emailTemplates");
+const { getRegistrationEmailTemplate, getRecoveryEmailTemplate} = require("../templates/emailTemplates");
 
 class MailService {
 
@@ -22,6 +22,21 @@ class MailService {
                 to: email,
                 subject: `Код подтверждения в TalkMap - ${code}`,
                 html: getRegistrationEmailTemplate(code)
+            });
+
+        }catch(err){
+            console.error(err);
+            throw err;
+        }
+    }
+
+    async sendRecoveryCode (email, code) {
+        try{
+            await this.transporter.sendMail({
+                from: process.env.MAIL_USER,
+                to: email,
+                subject: `Код восстановления в TalkMap - ${code}`,
+                html: getRecoveryEmailTemplate(code)
             });
 
         }catch(err){

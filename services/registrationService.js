@@ -26,6 +26,18 @@ class RegistrationService {
             throw err;
         }
     }
+    
+    async changeUserPassword(email, newPassword){
+        try{
+            await User.findOneAndUpdate(
+                { email: email },
+                { password: newPassword }
+            );
+        }catch (err) {
+            console.error("Ошибка при смене пароля");
+            throw err;
+        }
+    }
 
     async registerUser(email, password, nickname, b_date, gender, avatar){
         try {

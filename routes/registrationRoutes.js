@@ -8,6 +8,7 @@ router.post('/sendCheckCode', RegistrationController.sendCheckCode);
 router.post('/verifyCheckCode', RegistrationController.verifyCheckCode);
 router.post('/getCitiesByQ', RegistrationController.getCities);
 router.post('/registerUser', RegistrationController.registerUser);
+router.post('/changePassword', RegistrationController.changeUserPassword);
 
 router.get('/getCommonAvatars', RegistrationController.getCommonAvatars);
 

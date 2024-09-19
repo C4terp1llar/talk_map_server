@@ -39,7 +39,7 @@ class AuthController {
                 // сохраняю новый рефреш с новой инфой об устройстве в бд
                 await RegistrationService.saveRefreshToken(uid, refreshToken, device_info)
             }else{
-                refreshToken = refreshTokenForCurrentDevice; // если токен по инфе из реквеста существует тогда беру его (он точно не истек тк ранбше было clearExpired)
+                refreshToken = refreshTokenForCurrentDevice.token; // если токен по инфе из реквеста существует тогда беру его (он точно не истек тк ранбше было clearExpired)
             }
 
             res.cookie('refresh_token', refreshToken, {
@@ -72,7 +72,7 @@ class AuthController {
             // сравнение рефреша из реквеста и рефреша из бд
             const refreshTokenFromDb = await JwtService.getRefreshTokenByDevice(uid, device_info);
 
-            if (!refreshTokenFromDb || refreshTokenFromDb !== refreshToken) {
+            if (!refreshTokenFromDb || refreshTokenFromDb.token !== refreshToken) {
                 return res.status(403).json({ error: 'Неверный refresh токен' });
             }
 
