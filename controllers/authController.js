@@ -73,7 +73,7 @@ class AuthController {
             const refreshTokenFromDb = await JwtService.getRefreshTokenByDevice(uid, device_info);
 
             if (!refreshTokenFromDb || refreshTokenFromDb !== refreshToken) {
-                return res.status(401).json({ error: 'Неверный refresh токен' });
+                return res.status(403).json({ error: 'Неверный refresh токен' });
             }
 
             await JwtService.deleteRefreshToken(uid, device_info)
