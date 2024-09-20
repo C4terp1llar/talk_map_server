@@ -56,6 +56,31 @@ class AuthController {
         }
     }
 
+    async logout (req, res) {
+        const refreshToken = req.cookies.refresh_token;
+
+        if (!refreshToken) {
+            return res.status(401).json({ error: 'Нехватает данных или данные некорректны' });
+        }
+
+        try {
+            const { uid, device_info } = JwtService.verifyRefreshToken(refreshToken);
+
+            await JwtService.deleteRefreshToken(uid, device_info)
+
+            res.clearCookie('refresh_token', {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'None',
+            });
+
+            res.status(200).json({ message: 'Пользователь успешно разлогинен' });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при логауте' });
+        }
+    }
+
     async refresh(req, res) {
         const refreshToken = req.cookies.refresh_token;
 
@@ -127,14 +152,6 @@ class AuthController {
         }
     }
 
-    async test (req, res) {
-        try{
-            res.status(200).json({message: 'ok'});
-        }catch(err){
-            console.error(err);
-            return res.status(500).json({error: 'Ошибк'});
-        }
-    }
 }
 
 module.exports = new AuthController();

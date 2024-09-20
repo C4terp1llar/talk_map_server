@@ -104,6 +104,20 @@ class RegistrationController {
     }
     //
 
+    async checkNickname (req, res) {
+        const { nickname } = req.body;
+
+        if (!nickname) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const isTaken = await RegistrationService.checkUserNickname(nickname);
+            return res.status(200).json({isTaken: isTaken})
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при проверке никнейма'});
+        }
+    }
+
     async getCities(req, res){
         const { query } = req.body;
 

@@ -8,7 +8,7 @@ router.post('/login', AuthController.login);
 router.post('/refresh', AuthController.refresh);
 
 router.get('/sync', authMiddleware, AuthController.sync);
+router.post('/logout', authMiddleware, AuthController.logout);
 
-router.post('/test', authMiddleware, AuthController.test);
 
 module.exports = router;

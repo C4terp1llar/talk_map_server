@@ -39,6 +39,17 @@ class RegistrationService {
         }
     }
 
+    async checkUserNickname (nickname) {
+        try{
+            const user = await User.findOne({nickname: nickname});
+
+            return user !== null;
+        }catch(err){
+            console.error("Ошибка при проверке никнейма");
+            throw err;
+        }
+    }
+
     async registerUser(email, password, nickname, b_date, gender, avatar){
         try {
             console.log(avatar)
