@@ -85,7 +85,7 @@ class AuthController {
         const refreshToken = req.cookies.refresh_token;
 
         if (!refreshToken) {
-            return res.status(401).json({ error: 'Нехватает данных или данные некорректны'});
+            return res.status(403).json({ error: 'Нехватает данных или данные некорректны'});
         }
 
         try {
