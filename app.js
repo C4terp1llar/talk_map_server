@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 
 const registrationRoutes = require('./routes/registrationRoutes');
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const server = express();
 
@@ -30,6 +31,7 @@ server.use(cors({
 }));
 server.use('/api/reg', registrationRoutes);
 server.use('/api/auth', authRoutes);
+server.use('/api/user', userRoutes);
 
 mongoose
     .connect(process.env.MONGO_URL)
