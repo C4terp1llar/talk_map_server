@@ -5,6 +5,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const userController = require('../controllers/userController');
 
 router.get('/getUserMainInfo',authMiddleware, userController.getMainUserInfo);
+router.post('/setWallpaper',authMiddleware, userController.setUserWallpaper);
 
 
 module.exports = router;

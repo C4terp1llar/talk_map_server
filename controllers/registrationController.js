@@ -4,7 +4,7 @@ const GeoService = require('../services/geoService');
 const JwtService = require('../services/jwtService');
 const ImgService = require('../services/imgService');
 const AuthService = require('../services/authService');
-
+const UserService = require('../services/userService');
 const bcrypt = require('bcrypt');
 
 class RegistrationController {
@@ -35,10 +35,12 @@ class RegistrationController {
         console.log(email, code)
         try{
 
+            const hashedPassword = await bcrypt.hash(code, 5);
+
             if (type === 'recovery') {
-                await MailService.sendRecoveryCode(email, code);
+                await MailService.sendRecoveryCode(email, hashedPassword);
             }else{
-                await MailService.sendRegCode(email, code);
+                await MailService.sendRegCode(email, hashedPassword);
             }
 
             res.cookie('sessionId', token, {
@@ -63,9 +65,9 @@ class RegistrationController {
         try {
             const { email, verifyCode } = JwtService.verifySessionToken(token);
 
-            console.log(email, verifyCode, code)
+            const match = await bcrypt.compare(code, verifyCode);
 
-            if (verifyCode  === Number(code)) {
+            if (match) {
                 res.status(200).json({ message: `Емаил ${email} успешно верифицирован` });
             } else {
                 res.status(400).json({ message: 'Неверный код' });
@@ -154,13 +156,14 @@ class RegistrationController {
 
             const userPassword = await bcrypt.hash(password, 5);
 
-            const userAvatar = await ImgService.uploadImg(avatar)
+            const uid = await RegistrationService.registerUser(email, userPassword, nickname, userBDate, userGender)
 
-            console.log(userAvatar)
+            const newUserAvatar = await ImgService.uploadImg(avatar, uid, 'avatars');
 
-            const uid = await RegistrationService.registerUser(email, userPassword, nickname, userBDate, userGender, userAvatar)
+            await UserService.createAvatar(uid, ...newUserAvatar);
 
-            await RegistrationService.createAddress(uid, address) // адресс валид на фронте и содержит lat + lon + address (текст адреса)
+            await RegistrationService.createAddress(uid, address)
+
 
             const accessToken = JwtService.createAccessToken({ uid, email, device_info });
             const refreshToken = JwtService.createRefreshToken({ uid, email, device_info });

@@ -24,10 +24,6 @@ const UserSchema = new mongoose.Schema({
         type: String,
         enum: ['male', 'female'],
         required: true
-    },
-    avatar: {
-        type: String,
-        required: true
     }
 });
 

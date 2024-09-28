@@ -50,17 +50,14 @@ class RegistrationService {
         }
     }
 
-    async registerUser(email, password, nickname, b_date, gender, avatar){
+    async registerUser(email, password, nickname, b_date, gender){
         try {
-            console.log(avatar)
-
             const newUser = new User({
                 email: email,
                 password: password,
                 nickname: nickname,
                 b_date: b_date,
-                gender: gender,
-                avatar: avatar
+                gender: gender
             });
 
             const {_id} = await newUser.save();
