@@ -30,17 +30,17 @@ class RegistrationController {
 
         const code = Math.floor(1000 + Math.random() * 9000);
 
-        const token = JwtService.createSessionToken({email: email, verifyCode: code})
-
         console.log(email, code)
         try{
 
-            const hashedPassword = await bcrypt.hash(code, 5);
+            const hashedCode = await bcrypt.hash(code.toString(), 5);
+
+            const token = JwtService.createSessionToken({email: email, verifyCode: hashedCode})
 
             if (type === 'recovery') {
-                await MailService.sendRecoveryCode(email, hashedPassword);
+                await MailService.sendRecoveryCode(email, code);
             }else{
-                await MailService.sendRegCode(email, hashedPassword);
+                await MailService.sendRegCode(email, code);
             }
 
             res.cookie('sessionId', token, {
@@ -158,9 +158,9 @@ class RegistrationController {
 
             const uid = await RegistrationService.registerUser(email, userPassword, nickname, userBDate, userGender)
 
-            const newUserAvatar = await ImgService.uploadImg(avatar, uid, 'avatars');
+            const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(avatar, uid, 'avatars');
 
-            await UserService.createAvatar(uid, ...newUserAvatar);
+            await UserService.createAvatar(uid, public_id, asset_id, asset_url, path);
 
             await RegistrationService.createAddress(uid, address)
 

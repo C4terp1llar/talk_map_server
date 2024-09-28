@@ -25,10 +25,10 @@ class UserController {
         try{
             const uid = req.user.uid
 
-            const img = await ImgService.uploadImg(imgBlob, uid, 'wallpaper')
-            await userService.createWallpaper(uid, ...img);
+            const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(imgBlob, uid, 'wallpaper')
+            await userService.createWallpaper(uid, public_id, asset_id, asset_url, path);
 
-            res.status(200).json(img);
+            res.status(200).json(asset_url);
         }catch(err){
             console.error(err);
             return res.status(500).json({error: 'Ошибка при загрузке wallpaper'});
