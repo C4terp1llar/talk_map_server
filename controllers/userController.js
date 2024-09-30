@@ -31,8 +31,30 @@ class UserController {
             res.status(200).json(asset_url);
         }catch(err){
             console.error(err);
-            return res.status(500).json({error: 'Ошибка при загрузке wallpaper'});
+            return res.status(500).json({error: 'Ошибка при загрузке обоев'});
         }
+    }
+
+    async setUserAvatar (req, res) {
+        const { imgBlob } = req.body;
+
+        if (!imgBlob) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const uid = req.user.uid
+
+            const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(imgBlob, uid, 'wallpaper')
+            await userService.createAvatar(uid, public_id, asset_id, asset_url, path);
+
+            res.status(200).json(asset_url);
+        }catch(err){
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при загрузке аватара'});
+        }
+    }
+
+    async setUserDefaultWallpaper (req, res) {
+
     }
 }
 

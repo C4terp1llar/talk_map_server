@@ -9,22 +9,23 @@ const WallpaperSchema = new mongoose.Schema({
     public_id: {
         type: String,
         required: true,
-        default: 'default_resources/vnvmaag6dhzygdpfbehs'
     },
     asset_id: {
         type: String,
         required: true,
-        default: 'fc3cfdf819860c118dc1912050da9400'
     },
     asset_url: {
         type: String,
         required: true,
-        default: 'https://res.cloudinary.com/dgtij3vgm/image/upload/v1727551671/default_resources/vnvmaag6dhzygdpfbehs.jpg'
     },
     path: {
         type: String,
-        required: true,
-        default: '/default_resources/vnvmaag6dhzygdpfbehs.jpg'
+        required: true
+    },
+    defaultAsset: {
+        type: Boolean,
+        required: false,
+        default: false
     }
 });
 

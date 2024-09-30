@@ -21,6 +21,11 @@ const AvatarSchema = new mongoose.Schema({
     path: {
         type: String,
         required: true
+    },
+    defaultAsset: {
+        type: Boolean,
+        required: false,
+        default: false
     }
 });
 
