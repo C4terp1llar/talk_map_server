@@ -6,6 +6,7 @@ const ImgService = require('../services/imgService');
 const AuthService = require('../services/authService');
 const UserService = require('../services/userService');
 const bcrypt = require('bcrypt');
+const userService = require("../services/userService");
 
 class RegistrationController {
 
@@ -145,7 +146,7 @@ class RegistrationController {
     }
 
     async registerUser(req, res){
-        const {email, password, nickname, date_b, gender, avatar, address, device_info} = req.body;
+        const {email, password, nickname, date_b, gender, avatar, address, originalAvatar, device_info} = req.body;
 
         if (!email || !password || !nickname || !date_b || !gender || !avatar || !address || !device_info) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
@@ -158,12 +159,15 @@ class RegistrationController {
 
             const uid = await RegistrationService.registerUser(email, userPassword, nickname, userBDate, userGender)
 
-            const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(avatar, uid, 'avatars');
+            const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(avatar, uid, 'avatar');
+            await UserService.createAvatar(uid, public_id, asset_id, asset_url, path, 'onlyCrop');
 
-            await UserService.createAvatar(uid, public_id, asset_id, asset_url, path);
+            if (originalAvatar){
+                const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(originalAvatar, uid, 'originalAvatar')
+                await userService.createAvatar(uid, public_id, asset_id, asset_url, path, 'uploadCrop');
+            }
 
             await RegistrationService.createAddress(uid, address)
-
 
             const accessToken = JwtService.createAccessToken({ uid, email, device_info });
             const refreshToken = JwtService.createRefreshToken({ uid, email, device_info });

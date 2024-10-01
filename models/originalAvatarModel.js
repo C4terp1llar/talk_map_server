@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const WallpaperSchema = new mongoose.Schema({
+const originalAvatarSchema = new mongoose.Schema({
     user_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -8,15 +8,15 @@ const WallpaperSchema = new mongoose.Schema({
     },
     public_id: {
         type: String,
-        required: true,
+        required: true
     },
     asset_id: {
         type: String,
-        required: true,
+        required: true
     },
     asset_url: {
         type: String,
-        required: true,
+        required: true
     },
     path: {
         type: String,
@@ -24,6 +24,6 @@ const WallpaperSchema = new mongoose.Schema({
     }
 });
 
-const Wallpaper= mongoose.model('Wallpaper', WallpaperSchema, 'wallpapers');
+const originalAvatar= mongoose.model('originalAvatar', originalAvatarSchema, 'originalAvatars');
 
-module.exports = Wallpaper;
+module.exports = originalAvatar;

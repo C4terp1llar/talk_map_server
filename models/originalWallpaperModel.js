@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const WallpaperSchema = new mongoose.Schema({
+const originalWallpaperSchema = new mongoose.Schema({
     user_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -24,6 +24,6 @@ const WallpaperSchema = new mongoose.Schema({
     }
 });
 
-const Wallpaper= mongoose.model('Wallpaper', WallpaperSchema, 'wallpapers');
+const originalWallpaper= mongoose.model('originalWallpaper', originalWallpaperSchema, 'originalWallpapers');
 
-module.exports = Wallpaper;
+module.exports = originalWallpaper;

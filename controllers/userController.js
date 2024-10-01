@@ -1,5 +1,7 @@
 const userService = require('../services/userService')
 const ImgService = require('../services/imgService')
+const axios = require('axios')
+const {_logFunc} = require("nodemailer/lib/shared");
 class UserController {
     async getMainUserInfo (req, res) {
         try{
@@ -18,15 +20,20 @@ class UserController {
     }
 
     async setUserWallpaper (req, res) {
-        const { imgBlob } = req.body;
+        const { croppedImg, originalImg, force } = req.body;
 
-        if (!imgBlob) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+        if (!croppedImg || !force || (force !== 'uploadCrop' && force !== 'onlyCrop') || (force === 'uploadCrop' && !originalImg)) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
         try{
             const uid = req.user.uid
 
-            const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(imgBlob, uid, 'wallpaper')
-            await userService.createWallpaper(uid, public_id, asset_id, asset_url, path);
+            if (force === 'uploadCrop'){
+                const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(originalImg, uid, 'originalWallpaper')
+                await userService.createWallpaper(uid, public_id, asset_id, asset_url, path, 'uploadCrop');
+            }
+
+            const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(croppedImg, uid, 'wallpaper')
+            await userService.createWallpaper(uid, public_id, asset_id, asset_url, path, 'onlyCrop');
 
             res.status(200).json(asset_url);
         }catch(err){
@@ -36,15 +43,20 @@ class UserController {
     }
 
     async setUserAvatar (req, res) {
-        const { imgBlob } = req.body;
+        const { croppedImg, originalImg, force } = req.body;
 
-        if (!imgBlob) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+        if (!croppedImg || !force || (force !== 'uploadCrop' && force !== 'onlyCrop') || (force === 'uploadCrop' && !originalImg)) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
         try{
             const uid = req.user.uid
 
-            const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(imgBlob, uid, 'wallpaper')
-            await userService.createAvatar(uid, public_id, asset_id, asset_url, path);
+            if (force === 'uploadCrop'){
+                const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(originalImg, uid, 'originalAvatar')
+                await userService.createAvatar(uid, public_id, asset_id, asset_url, path, 'uploadCrop');
+            }
+
+            const {public_id, asset_id, asset_url, path} = await ImgService.uploadImg(croppedImg, uid, 'avatar')
+            await userService.createAvatar(uid, public_id, asset_id, asset_url, path, 'onlyCrop');
 
             res.status(200).json(asset_url);
         }catch(err){
@@ -53,8 +65,42 @@ class UserController {
         }
     }
 
-    async setUserDefaultWallpaper (req, res) {
+    async getOriginalWallpaper (req, res) {
+        try{
+            const uid = req.user.uid
 
+            const {asset_url} = await userService.getOriginalWallpaper(uid)
+
+            if (!asset_url) {
+                return res.status(404).json({ error: 'Оригинальные обои не найдены' });
+            }
+
+            const data = await userService.convertUrlToBase64(asset_url)
+
+            res.status(200).json(data);
+        }catch(err){
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при получении оригинальных обоев'});
+        }
+    }
+
+    async getOriginalAvatar (req, res) {
+        try{
+            const uid = req.user.uid
+
+            const {asset_url} = await userService.getOriginalAvatar(uid)
+
+            if (!asset_url) {
+                return res.status(404).json({ error: 'Оригинальный аватар не найден' });
+            }
+
+            const data = await userService.convertUrlToBase64(asset_url)
+
+            res.status(200).json(data);
+        }catch(err){
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при получении оригинального аватара'});
+        }
     }
 }
 
