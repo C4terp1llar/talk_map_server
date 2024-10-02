@@ -33,16 +33,18 @@ class ImgService {
 
     async uploadSingleImage(blob, uid, targetFolder) {
         try {
+
             const response = await cloudinary.uploader.upload(blob, {
                 resource_type: 'image',
-                folder: `${uid}/${targetFolder}`,
+                folder: `${uid}/${targetFolder}`
             });
 
             const url = cloudinary.url(response.public_id, {
                 transformation: [
                     {
-                        quality: 'auto',
-                        fetch_format: 'auto'
+                        quality: 'auto:low',
+                        fetch_format: 'auto',
+                        dpr: 'auto'
                     }
                 ]
             })

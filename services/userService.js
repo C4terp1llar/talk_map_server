@@ -30,7 +30,7 @@ class UserService {
 
     async getUserAvatar(uid) {
         try {
-            return await Avatar.findOne({ user_id: uid }).select('asset_url').lean();
+            return await Avatar.findOne({ user_id: uid }).lean();
         } catch (err) {
             console.error("Ошибка при получении аватара пользователя");
             throw err;
@@ -39,7 +39,7 @@ class UserService {
 
     async getUserWallpaper(uid) {
         try {
-            return await Wallpaper.findOne({ user_id: uid }).select('asset_url').lean();
+            return await Wallpaper.findOne({ user_id: uid }).lean();
         } catch (err) {
             console.error("Ошибка при получении обоев пользователя");
             throw err;
@@ -156,6 +156,16 @@ class UserService {
             return `data:${mimeType};base64,${base64Image}`;
         }catch (err) {
             console.error("Ошибка при конвертации url в base 64");
+            throw err;
+        }
+    }
+
+    async deleteAllWallpaper (uid){
+        try{
+            await Wallpaper.findOneAndDelete({user_id: uid})
+            await originalWallpaper.findOneAndDelete({user_id: uid})
+        }catch (err) {
+            console.error("Ошибка при удалении обоев");
             throw err;
         }
     }

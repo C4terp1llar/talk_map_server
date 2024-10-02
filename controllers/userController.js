@@ -102,6 +102,25 @@ class UserController {
             return res.status(500).json({error: 'Ошибка при получении оригинального аватара'});
         }
     }
+
+    async deleteUserWallpaper (req, res) {
+        try{
+            const uid = req.user.uid
+
+            const {public_id: wallpaper} = await userService.getUserWallpaper(uid)
+            const {public_id: wallpaperOrig} = await userService.getOriginalWallpaper(uid)
+
+            await Promise.all([
+                ImgService.deleteImg([wallpaper, wallpaperOrig]),
+                userService.deleteAllWallpaper(uid)
+            ])
+
+            res.status(200).json({message: 'ok'});
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при удалении обоев'});
+        }
+    }
 }
 
 module.exports = new UserController()
