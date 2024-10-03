@@ -1,32 +1,61 @@
 const axios = require("axios");
 
 class GeoService {
-    async getCitiesByTxt (query) {
+    async getCitiesByTxt (query, filter) {
         try{
+
             const response = await axios.get('https://nominatim.openstreetmap.org/search', {
                 params: {
                     q: query,
-                    format: 'json'
+                    format: 'json',
+                    addressdetails: 1,
                 },
                 headers: {
-                    'User-Agent': 'TalkMap/1.0 (m0skvitin@mail.ru)'
+                    'User-Agent': 'TalkMap web application'
                 }
             });
 
-            if (!response.data.length){
-                return {message: 'По данному запросу ничего не найдено'};
+            if (!response.data.length) return this.notFound();
+
+            let foundData = response.data;
+            console.log(foundData)
+            if (filter === 'building'){
+                const filteredData = foundData.filter(address => ['building', 'residential', 'house', 'apartments'].includes(address.addresstype))
+                return this.formatResponse(filteredData)
+            }else{
+                return this.formatResponse(foundData)
             }
-
-            return response.data.map((item) => ({
-                name: item.display_name,
-                lat: parseFloat(item.lat),
-                lon: parseFloat(item.lon)
-            }))
-
         }catch(err){
             console.error(err);
             throw err;
         }
+    }
+
+    notFound () {
+        return {message: 'По данному запросу ничего не найдено'};
+    }
+
+    formatResponse (foundAddressesArray) {
+        if (!foundAddressesArray.length) return this.notFound();
+        return foundAddressesArray.map((item) => ({
+            display_name: item.display_name,
+            lat: parseFloat(item.lat),
+            lon: parseFloat(item.lon),
+
+            type: item.type,
+            address_type: item.addresstype,
+            name: item.name,
+
+            city: item.address.city || item.address.village || item.address.town || item.address.municipality,
+
+            house_number: item.address.house_number ? parseFloat(item.address.house_number) : null,
+            road: item.address.road,
+
+            city_district: item.address.city_district,
+            state: item.address.state,
+
+            boundingbox: item.boundingbox,
+        }))
     }
 }
 

@@ -122,12 +122,12 @@ class RegistrationController {
     }
 
     async getCities(req, res){
-        const { query } = req.body;
+        const { query, filter } = req.body;
 
         if (!query) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
         try{
-            const response = await GeoService.getCitiesByTxt(query)
+            const response = await GeoService.getCitiesByTxt(query, filter)
             res.status(200).json(response);
         }catch (err) {
             console.error(err);
