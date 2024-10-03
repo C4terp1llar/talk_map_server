@@ -18,8 +18,8 @@ class GeoService {
             if (!response.data.length) return this.notFound();
 
             let foundData = response.data;
-            console.log(foundData)
-            if (filter === 'building'){
+
+            if (filter === 'buildings'){
                 const filteredData = foundData.filter(address => ['building', 'residential', 'house', 'apartments'].includes(address.addresstype))
                 return this.formatResponse(filteredData)
             }else{

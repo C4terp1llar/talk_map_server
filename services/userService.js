@@ -48,13 +48,7 @@ class UserService {
 
     async getUserAddress (uid){
         try{
-            const addressSnapshot = await Address.findOne({user_id: uid}).lean()
-
-            return{
-                lat: addressSnapshot.lat,
-                lon: addressSnapshot.lon,
-                address: addressSnapshot.address
-            }
+            return await Address.findOne({user_id: uid}).select('-user_id -_id -__v').lean()
         }catch(err){
             console.error("Ошибка при получении адреса пользователя");
             throw err;

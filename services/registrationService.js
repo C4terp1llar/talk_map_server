@@ -70,13 +70,11 @@ class RegistrationService {
         }
     }
 
-    async createAddress(uid, {lat, lon, name}) {
+    async createAddress(uid, address) {
         try {
             const newAddress = new Address({
                 user_id: uid,
-                lat,
-                lon,
-                address: name
+                ...address
             });
 
             await newAddress.save();

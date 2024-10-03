@@ -1,7 +1,6 @@
 const userService = require('../services/userService')
 const ImgService = require('../services/imgService')
-const axios = require('axios')
-const {_logFunc} = require("nodemailer/lib/shared");
+
 class UserController {
     async getMainUserInfo (req, res) {
         try{
