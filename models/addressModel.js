@@ -30,6 +30,10 @@ const AddressSchema = new mongoose.Schema({
         type: String,
         required: false
     },
+    name: {
+        type: String,
+        required: false
+    },
     road: {
         type: String,
         required: false
@@ -46,9 +50,17 @@ const AddressSchema = new mongoose.Schema({
         type: String,
         required: false
     },
+    country: {
+        type: String,
+        required: true
+    },
+    country_code: {
+        type: String,
+        required: true
+    },
     boundingbox: {
         type: [String],
-        required: false
+        required: true
     }
 });
 

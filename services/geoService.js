@@ -53,6 +53,8 @@ class GeoService {
 
             city_district: item.address.city_district,
             state: item.address.state,
+            country: item.address.country,
+            country_code: item.address.country_code,
 
             boundingbox: item.boundingbox,
         }))
