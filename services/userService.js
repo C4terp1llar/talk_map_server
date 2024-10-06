@@ -156,10 +156,31 @@ class UserService {
 
     async deleteAllWallpaper (uid){
         try{
-            await Wallpaper.findOneAndDelete({user_id: uid})
-            await originalWallpaper.findOneAndDelete({user_id: uid})
+            await Promise.all([
+                Wallpaper.findOneAndDelete({user_id: uid}),
+                originalWallpaper.findOneAndDelete({user_id: uid})
+            ])
         }catch (err) {
             console.error("Ошибка при удалении обоев");
+            throw err;
+        }
+    }
+
+    async changeNickname (uid, nick){
+        try{
+            await User.findByIdAndUpdate(uid, {nickname: nick})
+        }catch (err) {
+            console.error("Ошибка при изменении никнейма");
+            throw err;
+        }
+    }
+
+    async changeNicknameColor (uid, color){
+        try{
+            const newColor = color === 'default' ? null : color;
+            await User.findByIdAndUpdate(uid, {nickname_color: newColor})
+        }catch (err) {
+            console.error("Ошибка при изменении цвета никнейма");
             throw err;
         }
     }

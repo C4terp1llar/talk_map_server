@@ -120,6 +120,36 @@ class UserController {
             return res.status(500).json({error: 'Ошибка при удалении обоев'});
         }
     }
+
+    async changeUserNickname (req, res) {
+        const { nickname } = req.body;
+
+        if (!nickname) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const uid = req.user.uid
+            await userService.changeNickname(uid, nickname);
+            res.status(200).json({message: 'ok'});
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при изменении никнейма'});
+        }
+    }
+
+    async changeUserNicknameColor (req, res) {
+        const { color } = req.body;
+
+        if (!color) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const uid = req.user.uid
+            await userService.changeNicknameColor(uid, color);
+            res.status(200).json({message: 'ok'});
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при изменении цвета никнейма'});
+        }
+    }
 }
 
 module.exports = new UserController()

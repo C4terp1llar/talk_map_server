@@ -10,5 +10,7 @@ router.post('/setAvatar',authMiddleware, userController.setUserAvatar);
 router.post('/getOriginalAvatar',authMiddleware, userController.getOriginalAvatar);
 router.post('/getOriginalWallpaper',authMiddleware, userController.getOriginalWallpaper);
 router.post('/deleteWallpaper',authMiddleware, userController.deleteUserWallpaper);
+router.post('/changeNickname',authMiddleware, userController.changeUserNickname);
+router.post('/changeNicknameColor',authMiddleware, userController.changeUserNicknameColor);
 
 module.exports = router;

@@ -16,6 +16,11 @@ const UserSchema = new mongoose.Schema({
         unique: true,
         required: true
     },
+    nickname_color: {
+        type: String,
+        required: false,
+        default: null
+    },
     b_date: {
         type: Date,
         required: true
