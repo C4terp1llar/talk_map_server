@@ -12,5 +12,6 @@ router.post('/getOriginalWallpaper',authMiddleware, userController.getOriginalWa
 router.post('/deleteWallpaper',authMiddleware, userController.deleteUserWallpaper);
 router.post('/changeNickname',authMiddleware, userController.changeUserNickname);
 router.post('/changeNicknameColor',authMiddleware, userController.changeUserNicknameColor);
+router.post('/changeAddress',authMiddleware, userController.changeUserAddress);
 
 module.exports = router;

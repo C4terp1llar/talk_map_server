@@ -55,6 +55,15 @@ class UserService {
         }
     }
 
+    async changeAddress (uid, address){
+        try{
+            await Address.findOneAndUpdate({user_id: uid}, {$set: address})
+        }catch (err) {
+            console.error("Ошибка при изменении адреса пользователя");
+            throw err;
+        }
+    }
+
     async createAvatar (uid, public_id, asset_id, asset_url, path, force) {
         try{
             const model = force === 'uploadCrop' ? originalAvatar : Avatar
@@ -184,6 +193,8 @@ class UserService {
             throw err;
         }
     }
+
+
 }
 
 module.exports = new UserService();

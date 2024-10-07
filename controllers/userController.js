@@ -150,6 +150,22 @@ class UserController {
             return res.status(500).json({error: 'Ошибка при изменении цвета никнейма'});
         }
     }
+
+    async changeUserAddress (req, res) {
+        const { address } = req.body;
+
+        if (!address) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const uid = req.user.uid
+            await userService.changeAddress(uid, address)
+            const newAddress = await userService.getUserAddress(uid)
+            res.status(200).json({address: newAddress});
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при изменении адреса пользователя'});
+        }
+    }
 }
 
 module.exports = new UserController()
