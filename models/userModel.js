@@ -16,11 +16,6 @@ const UserSchema = new mongoose.Schema({
         unique: true,
         required: true
     },
-    nickname_color: {
-        type: String,
-        required: false,
-        default: null
-    },
     b_date: {
         type: Date,
         required: true
@@ -29,8 +24,15 @@ const UserSchema = new mongoose.Schema({
         type: String,
         enum: ['male', 'female'],
         required: true
+    },
+    nickname_color: {
+        type: String,
+        required: false,
+        default: null
     }
 });
+
+
 
 const User= mongoose.model('User', UserSchema);
 

@@ -13,5 +13,7 @@ router.post('/deleteWallpaper',authMiddleware, userController.deleteUserWallpape
 router.post('/changeNickname',authMiddleware, userController.changeUserNickname);
 router.post('/changeNicknameColor',authMiddleware, userController.changeUserNicknameColor);
 router.post('/changeAddress',authMiddleware, userController.changeUserAddress);
+router.post('/setTag',authMiddleware, userController.setUserTag);
+router.post('/deleteTag',authMiddleware, userController.deleteUserTag);
 
 module.exports = router;

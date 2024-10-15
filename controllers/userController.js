@@ -166,6 +166,38 @@ class UserController {
             return res.status(500).json({error: 'Ошибка при изменении адреса пользователя'});
         }
     }
+
+    async setUserTag (req, res) {
+        const { text, emoji } = req.body;
+
+        if (!text || !emoji) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const uid = req.user.uid
+            await userService.setUserTag(uid, emoji, text);
+            const tagsArr = await userService.getUserTags(uid);
+            res.status(200).json({tagsArr});
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при добавлении тега'});
+        }
+    }
+
+    async deleteUserTag (req, res) {
+        const { deleteTagText } = req.body;
+
+        if (!deleteTagText) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const uid = req.user.uid
+            await userService.deleteUserTag(uid, deleteTagText);
+            const tagsArr= await userService.getUserTags(uid);
+            res.status(200).json({tagsArr});
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при удалении тега'});
+        }
+    }
 }
 
 module.exports = new UserController()

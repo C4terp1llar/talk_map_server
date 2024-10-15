@@ -5,6 +5,7 @@ const Wallpaper = require("../models/wallpaperModel");
 const ImgService = require("../services/imgService");
 const originalWallpaper = require('../models/originalWallpaperModel')
 const originalAvatar = require('../models/originalAvatarModel');
+const Tag = require("../models/tagModel");
 
 const axios = require('axios');
 
@@ -12,15 +13,17 @@ class UserService {
     async getUserInfo(uid) {
         try {
             const mainData = await User.findById(uid).select('-password -_id -__v').lean();
-            const [avatar, wallpaper] = await Promise.all([
+            const [avatar, wallpaper, tags] = await Promise.all([
                 this.getUserAvatar(uid),
-                this.getUserWallpaper(uid)
+                this.getUserWallpaper(uid),
+                this.getUserTags(uid)
             ]);
 
             return {
                 ...mainData,
                 avatar: avatar ? avatar.asset_url : null,
-                wallpaper: wallpaper ? wallpaper.asset_url : null
+                wallpaper: wallpaper ? wallpaper.asset_url : null,
+                tags: tags ? tags : null
             };
         } catch (err) {
             console.error("Ошибка при получении информации о пользователе");
@@ -194,6 +197,33 @@ class UserService {
         }
     }
 
+    async setUserTag (uid, emoji, text){
+        try{
+            const tag = new Tag({ user_id: uid, emoji, text });
+            await tag.save();
+        }catch (err) {
+            console.error("Ошибка при добавлении тега");
+            throw err;
+        }
+    }
+
+    async getUserTags (uid){
+        try{
+            return await Tag.find({user_id: uid}).select('-_id -__v -user_id').lean();
+        }catch (err) {
+            console.error("Ошибка при получении тега");
+            throw err;
+        }
+    }
+
+    async deleteUserTag (uid, tagText){
+        try{
+            await Tag.findOneAndDelete({user_id: uid, text: tagText})
+        }catch (err) {
+            console.error("Ошибка при удалении тега");
+            throw err;
+        }
+    }
 
 }
 
