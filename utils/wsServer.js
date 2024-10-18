@@ -1,5 +1,5 @@
 const { Server } = require("socket.io");
-const wsBaseController = require('../controllers/wsBaseController')
+const wsBaseController = require("../controllers/wsBaseController");
 
 class WsServer {
 
@@ -18,13 +18,14 @@ class WsServer {
 
         this.wsNamespace = io.of("/ws");
 
+
         this.wsNamespace.on("connection", (socket) => {
-            wsBaseController.handleConnect(socket, this.connectedSockets)
+            // базовая обработка 'connection', внутри => 'disconnect' + 'connect_error'
+            wsBaseController.connect(socket, this.connectedSockets);
 
-            console.log(this.connectedSockets)
 
-            socket.on("disconnect", () => {
-                wsBaseController.handleDisconnect(socket, this.connectedSockets)
+            socket.on("custom_event", () => {
+                console.log("custom_event", socket.id, this.connectedSockets);
             });
         });
     }
