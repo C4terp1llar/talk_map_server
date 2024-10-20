@@ -1,6 +1,7 @@
 const axios = require("axios");
 
 class GeoService {
+
     async getCitiesByTxt (query, filter) {
         try{
 
@@ -22,7 +23,10 @@ class GeoService {
             if (filter === 'buildings'){
                 const filteredData = foundData.filter(address => ['building', 'residential', 'house', 'apartments'].includes(address.addresstype))
                 return this.formatResponse(filteredData)
-            }else{
+            }else if (filter === 'onlyTowns'){
+                const filteredData = foundData.filter(item => item.address.city || item.address.village || item.address.town || item.address.municipality)
+                return this.formatResponseOnlyTowns(filteredData)
+            } else{
                 return this.formatResponse(foundData)
             }
         }catch(err){
@@ -57,6 +61,15 @@ class GeoService {
             country_code: item.address.country_code,
 
             boundingbox: item.boundingbox,
+        }))
+    }
+
+    formatResponseOnlyTowns (foundAddressesArray) {
+        if (!foundAddressesArray.length) return this.notFound();
+        return foundAddressesArray.map((item) => ({
+            city: item.address.city || item.address.village || item.address.town || item.address.municipality,
+            state: item.address.state,
+            country: item.address.country,
         }))
     }
 }

@@ -16,4 +16,7 @@ router.post('/changeAddress',authMiddleware, userController.changeUserAddress);
 router.post('/setTag',authMiddleware, userController.setUserTag);
 router.post('/deleteTag',authMiddleware, userController.deleteUserTag);
 
+router.post('/findUsers',authMiddleware, userController.findUsers);
+
+
 module.exports = router;

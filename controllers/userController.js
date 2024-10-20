@@ -198,6 +198,18 @@ class UserController {
             return res.status(500).json({error: 'Ошибка при удалении тега'});
         }
     }
+
+    async findUsers (req, res) {
+        const { cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter } = req.body;
+
+        try{
+            const users = await userService.findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter);
+            res.status(200).json({users});
+        }catch (err) {
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка при поиске пользователей'});
+        }
+    }
 }
 
 module.exports = new UserController()
