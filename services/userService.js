@@ -292,6 +292,7 @@ class UserService {
                 {
                     $project: {
                         nickname: 1,
+                        nickname_color: 1,
                         gender: 1,
                         b_date: 1,
                         'address.city': 1,
