@@ -210,6 +210,29 @@ class UserController {
             return res.status(500).json({error: 'Ошибка при поиске пользователей'});
         }
     }
+
+    async getMainExternalUserInfo (req, res) {
+        const { uid } = req.body;
+
+        if (!uid) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+
+            const [mainInfo, addressInfo] = await Promise.all([
+                userService.getUserInfo(uid, 'external'),
+                userService.getUserAddress(uid, 'external')
+            ]);
+
+            if (!mainInfo || !addressInfo){
+                return res.status(400).json({message: 'Пользователь не существует'});
+            }
+
+            res.status(200).json({main: mainInfo, address: addressInfo});
+        }catch(err){
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка получении информации о стороннем пользователе'});
+        }
+    }
 }
 
 module.exports = new UserController()

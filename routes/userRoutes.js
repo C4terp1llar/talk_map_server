@@ -17,6 +17,7 @@ router.post('/setTag',authMiddleware, userController.setUserTag);
 router.post('/deleteTag',authMiddleware, userController.deleteUserTag);
 
 router.post('/findUsers',authMiddleware, userController.findUsers);
+router.post('/getExternalUserMainInfo',authMiddleware, userController.getMainExternalUserInfo);
 
 
 module.exports = router;

@@ -10,9 +10,18 @@ const Tag = require("../models/tagModel");
 const axios = require('axios');
 
 class UserService {
-    async getUserInfo(uid) {
+    async getUserInfo(uid, mode) {
         try {
-            const mainData = await User.findById(uid).select('-password -_id -__v').lean();
+
+            let excludeString;
+
+            if (mode && mode === 'external'){
+                excludeString = '-email -password -__v'
+            }else{
+                excludeString = '-password -_id -__v'
+            }
+
+            const mainData = await User.findById(uid).select(excludeString).lean();
             const [avatar, wallpaper, tags] = await Promise.all([
                 this.getUserAvatar(uid),
                 this.getUserWallpaper(uid),
@@ -49,9 +58,17 @@ class UserService {
         }
     }
 
-    async getUserAddress(uid) {
+    async getUserAddress(uid, mode) {
         try {
-            return await Address.findOne({user_id: uid}).select('-user_id -_id -__v').lean()
+            let excludeString;
+
+            if (mode && mode === 'external'){
+                excludeString = 'city country country_code -_id'
+            }else{
+                excludeString = '-user_id -_id -__v'
+            }
+
+            return await Address.findOne({user_id: uid}).select(excludeString).lean()
         } catch (err) {
             console.error("Ошибка при получении адреса пользователя");
             throw err;
