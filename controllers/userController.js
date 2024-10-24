@@ -200,14 +200,29 @@ class UserController {
     }
 
     async findUsers (req, res) {
-        const { cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter } = req.body;
+        const { cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, page = 1, limit = 10 } = req.body;
 
         try{
-            const users = await userService.findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter);
+            const requesterUid = req.user.uid
+            const users = await userService.findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit);
             res.status(200).json({users});
         }catch (err) {
             console.error(err);
             return res.status(500).json({error: 'Ошибка при поиске пользователей'});
+        }
+    }
+
+    async isUserExist (req, res) {
+        const { uid } = req.body;
+
+        if (!uid) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+
+        try{
+            const isExist = await userService.isUserExists(uid);
+            res.status(200).json({isExist});
+        }catch(err){
+            console.error(err);
+            return res.status(500).json({error: 'Ошибка получении информации о стороннем пользователе'});
         }
     }
 

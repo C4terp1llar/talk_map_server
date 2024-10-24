@@ -16,6 +16,7 @@ router.post('/changeAddress',authMiddleware, userController.changeUserAddress);
 router.post('/setTag',authMiddleware, userController.setUserTag);
 router.post('/deleteTag',authMiddleware, userController.deleteUserTag);
 
+router.post('/isUserExist',authMiddleware, userController.isUserExist);
 router.post('/findUsers',authMiddleware, userController.findUsers);
 router.post('/getExternalUserMainInfo',authMiddleware, userController.getMainExternalUserInfo);
 

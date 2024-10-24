@@ -7,6 +7,8 @@ const originalWallpaper = require('../models/originalWallpaperModel')
 const originalAvatar = require('../models/originalAvatarModel');
 const Tag = require("../models/tagModel");
 
+const mongoose = require('mongoose');
+
 const axios = require('axios');
 
 class UserService {
@@ -242,12 +244,17 @@ class UserService {
         }
     }
 
-    async findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter) {
+    async findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit) {
         try {
             const currentDate = new Date();
             const currentYear = currentDate.getFullYear();
 
             const filter = {};
+
+            // исключить пользователя который запрашивает
+            if (requesterUid) {
+                filter._id = { $ne: new mongoose.Types.ObjectId(requesterUid) };
+            }
 
             // если передан пол
             if (genderFilter && genderFilter !== 'any') {
@@ -269,7 +276,6 @@ class UserService {
             if (nicknameFilter) {
                 filter.nickname = new RegExp(nicknameFilter, 'i');
             }
-
 
             const users = await User.aggregate([
                 {
@@ -318,6 +324,12 @@ class UserService {
                         'avatar.asset_url': 1
                     },
                 },
+                {
+                    $skip: (page - 1) * limit,
+                },
+                {
+                    $limit: limit,
+                }
             ]);
 
             return users;
@@ -327,6 +339,17 @@ class UserService {
         }
     }
 
+    async isUserExists(uid) {
+        try {
+            if (!mongoose.Types.ObjectId.isValid(uid)) return false;
+
+            const userExists = await User.exists({_id: uid});
+            return !!userExists;
+        } catch (err) {
+            console.error("Ошибка при проверке существования пользователя");
+            throw err;
+        }
+    }
 }
 
 module.exports = new UserService();
