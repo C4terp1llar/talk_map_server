@@ -6,6 +6,7 @@ const ImgService = require("../services/imgService");
 const originalWallpaper = require('../models/originalWallpaperModel')
 const originalAvatar = require('../models/originalAvatarModel');
 const Tag = require("../models/tagModel");
+const friendRequest = require("../models/friendRequestModel");
 
 const mongoose = require('mongoose');
 
@@ -328,11 +329,19 @@ class UserService {
                     $skip: (page - 1) * limit,
                 },
                 {
-                    $limit: limit,
+                    $limit: limit + 1,
                 }
             ]);
 
-            return users;
+            const hasMore = users.length > limit;
+
+            if (hasMore) users.pop();
+
+            return {
+                users,
+                hasMore
+            };
+
         } catch (err) {
             console.error("Ошибка при поиске пользователей");
             throw err;
@@ -350,6 +359,46 @@ class UserService {
             throw err;
         }
     }
+
+    async createFriendReq(initiator, sender, recipient) {
+        try{
+            const newFriendReq = new friendRequest({initiator_id: initiator, sender_id: sender, recipient_id: recipient});
+            await newFriendReq.save()
+        }catch(err){
+            console.error("Ошибка при создании заявки");
+            throw err;
+        }
+    }
+
+    async isIncomingFriendReq(currentUserId, sender, recipient) {
+        try {
+            const requestExists = await friendRequest.exists({ sender_id: sender, recipient_id: recipient });
+            return requestExists && recipient.toString() === currentUserId.toString();
+        } catch (err) {
+            console.error("Ошибка при проверке входящей заявки");
+            throw err;
+        }
+    }
+
+    async isOutgoingFriendReq(currentUserId, sender, recipient) {
+        try {
+            const requestExists = await friendRequest.exists({ sender_id: sender, recipient_id: recipient });
+            return requestExists && sender.toString() === currentUserId.toString();
+        } catch (err) {
+            console.error("Ошибка при проверке исходящей заявки");
+            throw err;
+        }
+    }
+
+    async deleteFriendReq(initiator, sender, recipient) {
+        try {
+            await friendRequest.findOneAndDelete({ initiator_id: initiator, sender_id: sender, recipient_id: recipient });
+        } catch (err) {
+            console.error("Ошибка при удалении заявки");
+            throw err;
+        }
+    }
+
 }
 
 module.exports = new UserService();

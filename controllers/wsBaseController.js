@@ -8,10 +8,16 @@ class WsBaseController {
         if (token) {
             try {
                 const userData = JwtService.verifyAccessToken(token);
-                connectedSockets.set(socket.id, userData);
-                console.log(`Пользователь ${userData.uid} подключен с сокетом ${socket.id}`);
+                const userId = userData.uid;
+
+                if (!connectedSockets[userId]) {
+                    connectedSockets[userId] = [];
+                }
+
+                connectedSockets[userId].push(socket.id);
             } catch (err) {
                 console.error('Некорректный токен');
+                socket.emit('tokenError');
                 socket.disconnect();
                 return;
             }
@@ -27,9 +33,16 @@ class WsBaseController {
     attachBaseWsHandlers(socket, connectedSockets) {
 
         socket.on("disconnect", () => {
-            if (connectedSockets.has(socket.id)) {
-                console.log(`Пользователь ${connectedSockets.get(socket.id).uid} отключен с сокетом ${socket.id}`);
-                connectedSockets.delete(socket.id);
+            const userId = Object.keys(connectedSockets).find(uid =>
+                connectedSockets[uid].includes(socket.id)
+            );
+
+            if (userId) {
+                connectedSockets[userId] = connectedSockets[userId].filter(id => id !== socket.id);
+
+                if (connectedSockets[userId].length === 0) {
+                    delete connectedSockets[userId];
+                }
             }
         });
 
@@ -37,6 +50,7 @@ class WsBaseController {
             console.error("Ошибка соединения:", error.message);
         });
     }
+
 }
 
 module.exports = new WsBaseController();

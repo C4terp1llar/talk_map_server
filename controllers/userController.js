@@ -1,5 +1,6 @@
 const userService = require('../services/userService')
 const ImgService = require('../services/imgService')
+const wsServer = require('../utils/wsServer')
 
 class UserController {
     async getMainUserInfo (req, res) {
@@ -204,8 +205,8 @@ class UserController {
 
         try{
             const requesterUid = req.user.uid
-            const users = await userService.findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit);
-            res.status(200).json({users});
+            const {users, hasMore} = await userService.findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit);
+            res.status(200).json({users, hasMore});
         }catch (err) {
             console.error(err);
             return res.status(500).json({error: 'Ошибка при поиске пользователей'});
@@ -226,26 +227,77 @@ class UserController {
         }
     }
 
-    async getMainExternalUserInfo (req, res) {
+    async getMainExternalUserInfo(req, res) {
         const { uid } = req.body;
 
-        if (!uid) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
+        if (!uid) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
 
-        try{
+        try {
+            const currentUserId = req.user.uid;
 
-            const [mainInfo, addressInfo] = await Promise.all([
+            const [mainInfo, addressInfo, isIncoming, isOutgoing] = await Promise.all([
                 userService.getUserInfo(uid, 'external'),
-                userService.getUserAddress(uid, 'external')
+                userService.getUserAddress(uid, 'external'),
+                userService.isIncomingFriendReq(currentUserId, uid, currentUserId),
+                userService.isOutgoingFriendReq(currentUserId, currentUserId, uid)
             ]);
 
-            if (!mainInfo || !addressInfo){
-                return res.status(400).json({message: 'Пользователь не существует'});
+            if (!mainInfo || !addressInfo) {
+                return res.status(400).json({ message: 'Пользователь не существует' });
             }
 
-            res.status(200).json({main: mainInfo, address: addressInfo});
-        }catch(err){
+            res.status(200).json({ main: mainInfo, address: addressInfo, isIncoming, isOutgoing });
+        } catch (err) {
             console.error(err);
-            return res.status(500).json({error: 'Ошибка получении информации о стороннем пользователе'});
+            return res.status(500).json({ error: 'Ошибка получении информации о стороннем пользователе' });
+        }
+    }
+
+    async sendFriendRequest(req, res) {
+        const { recipient_id } = req.body;
+
+        if (!recipient_id) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const sender_id = req.user.uid;
+
+            const isRecipientExist = await userService.isUserExists(recipient_id);
+
+            if (!isRecipientExist) {
+                return res.status(400).json({ message: 'Пользователь не существует' });
+            }
+
+            await userService.createFriendReq(sender_id, sender_id, recipient_id);
+
+            wsServer.emitToUser(recipient_id, 'send_friend_request', {recipient_id, sender_id})
+
+            return res.status(200).json({ message: 'ok' });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при отправке заявки в друзья' });
+        }
+    }
+
+    async cancelFriendRequest(req, res) {
+        const { recipient_id } = req.body;
+
+        if (!recipient_id) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const sender_id = req.user.uid;
+
+            const isRecipientExist = await userService.isUserExists(recipient_id);
+
+            if (!isRecipientExist) {
+                return res.status(400).json({ message: 'Пользователь не существует' });
+            }
+
+            await userService.deleteFriendReq(sender_id, sender_id, recipient_id);
+
+            return res.status(200).json({ message: 'ok' });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при отмене заявки в друзья' });
         }
     }
 }

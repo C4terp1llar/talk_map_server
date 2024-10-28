@@ -13,7 +13,7 @@ class JwtService {
     }
 
     verifyAccessToken(token) {
-        return jwt.verify(token, this.accessTokenSecret);
+        return jwt.verify(token, this.accessTokenSecret)
     }
 
     createRefreshToken(payload, expiresIn = '15d') {

@@ -5,7 +5,7 @@ class WsServer {
 
     constructor() {
         this.wsNamespace = null;
-        this.connectedSockets = new Map();
+        this.connectedSockets = {};
     }
 
     initializeSocketServer(httpServer, allowedOrigins) {
@@ -27,6 +27,16 @@ class WsServer {
             socket.on("custom_event", () => {
                 console.log("custom_event", socket.id, this.connectedSockets);
             });
+        });
+    }
+
+    emitToUser(userId, eventName, data) {
+        const sockets = this.connectedSockets[userId] || [];
+        sockets.forEach(socketId => {
+            const socket = this.wsNamespace.sockets.get(socketId);
+            if (socket) {
+                socket.emit(eventName, data);
+            }
         });
     }
 }
