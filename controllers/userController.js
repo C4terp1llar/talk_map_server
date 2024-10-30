@@ -235,18 +235,19 @@ class UserController {
         try {
             const currentUserId = req.user.uid;
 
-            const [mainInfo, addressInfo, isIncoming, isOutgoing] = await Promise.all([
+            const [mainInfo, addressInfo, isIncoming, isOutgoing, isFriendship] = await Promise.all([
                 userService.getUserInfo(uid, 'external'),
                 userService.getUserAddress(uid, 'external'),
                 userService.isIncomingFriendReq(currentUserId, uid, currentUserId),
-                userService.isOutgoingFriendReq(currentUserId, currentUserId, uid)
+                userService.isOutgoingFriendReq(currentUserId, currentUserId, uid),
+                userService.isFriendshipExists(currentUserId, uid),
             ]);
 
             if (!mainInfo || !addressInfo) {
                 return res.status(400).json({ message: 'Пользователь не существует' });
             }
 
-            res.status(200).json({ main: mainInfo, address: addressInfo, isIncoming, isOutgoing });
+            res.status(200).json({ main: mainInfo, address: addressInfo, isIncoming, isOutgoing, isFriendship });
         } catch (err) {
             console.error(err);
             return res.status(500).json({ error: 'Ошибка получении информации о стороннем пользователе' });
@@ -267,9 +268,18 @@ class UserController {
                 return res.status(400).json({ message: 'Пользователь не существует' });
             }
 
+            const isReverseReqExist = await userService.isFriendReqExist(recipient_id, recipient_id, sender_id)
+
+            if (isReverseReqExist){
+                await userService.createFriendship(recipient_id, sender_id);
+                await userService.deleteFriendReq(recipient_id, recipient_id, sender_id);
+                wsServer.emitToUser(sender_id, 'submit_friend_request', {recipient_id})
+                return res.status(200).json({ message: 'Заявка в друзья подтверждена' });
+            }
+
             await userService.createFriendReq(sender_id, sender_id, recipient_id);
 
-            wsServer.emitToUser(recipient_id, 'send_friend_request', {recipient_id, sender_id})
+            wsServer.emitToUser(recipient_id, 'receive_friend_request', {sender_id})
 
             return res.status(200).json({ message: 'ok' });
         } catch (err) {
@@ -294,10 +304,82 @@ class UserController {
 
             await userService.deleteFriendReq(sender_id, sender_id, recipient_id);
 
+            wsServer.emitToUser(recipient_id, 'abort_friend_request', {sender_id})
+
             return res.status(200).json({ message: 'ok' });
         } catch (err) {
             console.error(err);
             return res.status(500).json({ error: 'Ошибка при отмене заявки в друзья' });
+        }
+    }
+
+    async declineFriendRequest(req, res) {
+        const { sender_id } = req.body;
+
+        if (!sender_id) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const recipient_id = req.user.uid;
+
+            const isSenderExist = await userService.isUserExists(sender_id);
+
+            if (!isSenderExist) {
+                return res.status(400).json({ message: 'Пользователь не существует' });
+            }
+
+            await userService.deleteFriendReq(sender_id, sender_id, recipient_id);
+
+            wsServer.emitToUser(sender_id, 'decline_friend_request', {recipient_id})
+
+            return res.status(200).json({ message: 'ok' });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при отклонении заявки в друзья' });
+        }
+    }
+
+    async submitFriendReq(req, res) {
+        const { sender_id } = req.body;
+
+        if (!sender_id) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const recipient_id = req.user.uid;
+
+            const isSenderExist = await userService.isUserExists(recipient_id);
+
+            if (!isSenderExist) {
+                return res.status(400).json({ message: 'Пользователь не существует' });
+            }
+
+            await userService.createFriendship(sender_id, recipient_id);
+            await userService.deleteFriendReq(sender_id, sender_id, recipient_id);
+
+            wsServer.emitToUser(sender_id, 'submit_friend_request', {recipient_id})
+
+            return res.status(200).json({ message: 'Заявка в друзья подтверждена' });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при создании дружбы' });
+        }
+    }
+
+    async deleteFriendship(req, res) {
+        const { recipient_id } = req.body;
+
+        if (!recipient_id) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const sender_id = req.user.uid;
+
+            await userService.deleteFriendship(sender_id, recipient_id)
+
+            wsServer.emitToUser(recipient_id, 'delete_friendship', {sender_id})
+
+            return res.status(200).json({ message: 'ok' });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при удалении дружбы' });
         }
     }
 }

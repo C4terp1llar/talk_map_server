@@ -21,6 +21,9 @@ router.post('/findUsers',authMiddleware, userController.findUsers);
 router.post('/getExternalUserMainInfo',authMiddleware, userController.getMainExternalUserInfo);
 router.post('/sendFriendRequest',authMiddleware, userController.sendFriendRequest);
 router.post('/cancelFriendRequest',authMiddleware, userController.cancelFriendRequest);
+router.post('/declineFriendRequest',authMiddleware, userController.declineFriendRequest);
+router.post('/submitFriendRequest',authMiddleware, userController.submitFriendReq);
+router.post('/deleteFriendship',authMiddleware, userController.deleteFriendship);
 
 
 module.exports = router;

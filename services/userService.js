@@ -7,6 +7,7 @@ const originalWallpaper = require('../models/originalWallpaperModel')
 const originalAvatar = require('../models/originalAvatarModel');
 const Tag = require("../models/tagModel");
 const friendRequest = require("../models/friendRequestModel");
+const Friend = require("../models/friendModel");
 
 const mongoose = require('mongoose');
 
@@ -390,6 +391,16 @@ class UserService {
         }
     }
 
+    async isFriendReqExist(initiator, sender, recipient) {
+        try {
+            const requestExists = await friendRequest.exists({initiator_id: initiator ,sender_id: sender, recipient_id: recipient });
+            return !!requestExists;
+        } catch (err) {
+            console.error("Ошибка при проверке существования заявки");
+            throw err;
+        }
+    }
+
     async deleteFriendReq(initiator, sender, recipient) {
         try {
             await friendRequest.findOneAndDelete({ initiator_id: initiator, sender_id: sender, recipient_id: recipient });
@@ -399,6 +410,49 @@ class UserService {
         }
     }
 
+    async createFriendship (sender, recipient) {
+        try {
+            const newFriendship = new Friend({
+                user1_id: sender,
+                user2_id: recipient
+            });
+
+            await newFriendship.save();
+        } catch (err) {
+            console.error("Ошибка при создании дружбы");
+            throw err;
+        }
+    }
+
+    async isFriendshipExists(userId1, userId2) {
+        try {
+            const friendship = await Friend.findOne({
+                $or: [
+                    { user1_id: userId1, user2_id: userId2 },
+                    { user1_id: userId2, user2_id: userId1 }
+                ]
+            });
+
+            return !!friendship;
+        } catch (err) {
+            console.error("Ошибка при проверке существования дружбы");
+            throw err;
+        }
+    }
+
+    async deleteFriendship(sender, recipient) {
+        try {
+            await Friend.findOneAndDelete({
+                $or: [
+                    { user1_id: sender, user2_id: recipient },
+                    { user1_id: recipient, user2_id: sender }
+                ]
+            });
+        } catch (err) {
+            console.error("Ошибка при удалении дружбы");
+            throw err;
+        }
+    }
 }
 
 module.exports = new UserService();
