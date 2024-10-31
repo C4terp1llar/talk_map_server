@@ -279,7 +279,8 @@ class UserController {
 
             await userService.createFriendReq(sender_id, sender_id, recipient_id);
 
-            wsServer.emitToUser(recipient_id, 'receive_friend_request', {sender_id})
+            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(sender_id, sender_id, recipient_id)
+            wsServer.emitToUser(recipient_id, 'receive_friend_request', {wsFriendRequestSnap})
 
             return res.status(200).json({ message: 'ok' });
         } catch (err) {
@@ -302,9 +303,11 @@ class UserController {
                 return res.status(400).json({ message: 'Пользователь не существует' });
             }
 
+            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(sender_id, sender_id, recipient_id)
+
             await userService.deleteFriendReq(sender_id, sender_id, recipient_id);
 
-            wsServer.emitToUser(recipient_id, 'abort_friend_request', {sender_id})
+            wsServer.emitToUser(recipient_id, 'abort_friend_request', {wsFriendRequestSnap})
 
             return res.status(200).json({ message: 'ok' });
         } catch (err) {
@@ -380,6 +383,29 @@ class UserController {
         } catch (err) {
             console.error(err);
             return res.status(500).json({ error: 'Ошибка при удалении дружбы' });
+        }
+    }
+
+    async getFriendReqs(req, res) {
+        const { mode, page = 1, limit = 10  } = req.body;
+
+        if (mode !== 'incoming' && mode !== 'outgoing') return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const uid = req.user.uid;
+
+            const isUserExist = await userService.isUserExists(uid);
+
+            if (!isUserExist) {
+                return res.status(400).json({ message: 'Пользователь не существует' });
+            }
+
+            const {friendRequests, hasMore} = await userService.getFriendReqsDetailed(uid, mode, page, limit);
+
+            return res.status(200).json({ requests: friendRequests, hasMore: hasMore });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при получении заявок на дружбу"});
         }
     }
 }

@@ -453,6 +453,192 @@ class UserService {
             throw err;
         }
     }
+
+    async getFriendReqsDetailed (uid, mode, page = 1, limit = 10) {
+        try {
+            const matchFilter = {};
+
+            if (mode === 'incoming') {
+                matchFilter.recipient_id = new mongoose.Types.ObjectId(uid);
+            } else if (mode === 'outgoing') {
+                matchFilter.initiator_id = new mongoose.Types.ObjectId(uid);
+            } else {
+                new Error("Некорректный mode");
+            }
+
+            const friendRequests = await friendRequest.aggregate([
+                {
+                    $match: matchFilter
+                },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: mode === 'incoming' ? 'initiator_id' : 'recipient_id',
+                        foreignField: '_id',
+                        as: 'userInfo'
+                    }
+                },
+                {
+                    $unwind: {
+                        path: '$userInfo',
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'addresses',
+                        localField: mode === 'incoming' ? 'initiator_id' : 'recipient_id',
+                        foreignField: 'user_id',
+                        as: 'address',
+                    }
+                },
+                {
+                    $unwind: {
+                        path: '$address',
+                        preserveNullAndEmptyArrays: true,
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'avatars',
+                        localField: mode === 'incoming' ? 'initiator_id' : 'recipient_id',
+                        foreignField: 'user_id',
+                        as: 'avatar'
+                    }
+                },
+                {
+                    $unwind: {
+                        path: '$avatar',
+                        preserveNullAndEmptyArrays: true
+                    }
+                },
+                {
+                    $project: {
+                        initiator_id: 1,
+                        sender_id: 1,
+                        recipient_id: 1,
+                        send_time: 1,
+                        'userInfo.nickname': 1,
+                        'userInfo.nickname_color': 1,
+                        'userInfo.gender': 1,
+                        'userInfo.b_date': 1,
+                        'address.city': 1,
+                        'address.country': 1,
+                        'address.country_code': 1,
+                        'avatar.asset_url': 1
+                    }
+                },
+                {
+                    $skip: (page - 1) * limit,
+                },
+                {
+                    $limit: limit + 1,
+                }
+            ]);
+
+            const hasMore = friendRequests.length > limit;
+
+            if (hasMore) {
+                friendRequests.pop();
+            }
+
+            return {
+                friendRequests,
+                hasMore
+            }
+        } catch (err) {
+            console.error("Ошибка при получении заявок дружбы и информации о них");
+            throw err;
+        }
+    };
+
+    async getOneFriendReqDetailed(initiatorId, senderId, recipientId) {
+        try {
+            if (!initiatorId || !senderId || !recipientId) {
+                new Error("Отсутствуют обязательные параметры");
+            }
+
+            const matchFilter = {
+                $or: [
+                    { initiator_id: new mongoose.Types.ObjectId(initiatorId) },
+                    { sender_id: new mongoose.Types.ObjectId(senderId) },
+                    { recipient_id: new mongoose.Types.ObjectId(recipientId) }
+                ]
+            };
+
+            const foundRequest = await friendRequest.aggregate([
+                {
+                    $match: matchFilter
+                },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'initiator_id',
+                        foreignField: '_id',
+                        as: 'userInfo'
+                    }
+                },
+                {
+                    $unwind: {
+                        path: '$userInfo',
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'addresses',
+                        localField: 'initiator_id',
+                        foreignField: 'user_id',
+                        as: 'address',
+                    }
+                },
+                {
+                    $unwind: {
+                        path: '$address',
+                        preserveNullAndEmptyArrays: true,
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'avatars',
+                        localField: 'initiator_id',
+                        foreignField: 'user_id',
+                        as: 'avatar'
+                    }
+                },
+                {
+                    $unwind: {
+                        path: '$avatar',
+                        preserveNullAndEmptyArrays: true
+                    }
+                },
+                {
+                    $project: {
+                        initiator_id: 1,
+                        sender_id: 1,
+                        recipient_id: 1,
+                        send_time: 1,
+                        'userInfo.nickname': 1,
+                        'userInfo.nickname_color': 1,
+                        'userInfo.gender': 1,
+                        'userInfo.b_date': 1,
+                        'address.city': 1,
+                        'address.country': 1,
+                        'address.country_code': 1,
+                        'avatar.asset_url': 1
+                    }
+                }
+            ]);
+
+            return foundRequest.length > 0 ? foundRequest[0] : null;
+        } catch (err) {
+            console.error("Ошибка при получении одной заявки дружбы и информации о ней");
+            throw err;
+        }
+    }
+
+
+
 }
 
 module.exports = new UserService();
