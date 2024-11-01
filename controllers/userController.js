@@ -382,7 +382,7 @@ class UserController {
             return res.status(200).json({ message: 'ok' });
         } catch (err) {
             console.error(err);
-            return res.status(500).json({ error: 'Ошибка при удалении дружбы' });
+            return res.status(500).json({ error: 'Ошибка при удалении заявки в друзья' });
         }
     }
 
@@ -405,7 +405,7 @@ class UserController {
             return res.status(200).json({ requests: friendRequests, hasMore: hasMore });
         } catch (err) {
             console.error(err);
-            return res.status(500).json({ error: "Ошибка при получении заявок на дружбу"});
+            return res.status(500).json({ error: "Ошибка при получении заявок в друзья"});
         }
     }
 }
