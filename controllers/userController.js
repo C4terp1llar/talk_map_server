@@ -330,9 +330,11 @@ class UserController {
                 return res.status(400).json({ message: 'Пользователь не существует' });
             }
 
+            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(sender_id, sender_id, recipient_id)
+
             await userService.deleteFriendReq(sender_id, sender_id, recipient_id);
 
-            wsServer.emitToUser(sender_id, 'decline_friend_request', {recipient_id})
+            wsServer.emitToUser(sender_id, 'decline_friend_request', {wsFriendRequestSnap})
 
             return res.status(200).json({ message: 'ok' });
         } catch (err) {
@@ -355,10 +357,14 @@ class UserController {
                 return res.status(400).json({ message: 'Пользователь не существует' });
             }
 
+
             await userService.createFriendship(sender_id, recipient_id);
+
+            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(sender_id, sender_id, recipient_id)
+
             await userService.deleteFriendReq(sender_id, sender_id, recipient_id);
 
-            wsServer.emitToUser(sender_id, 'submit_friend_request', {recipient_id})
+            wsServer.emitToUser(sender_id, 'submit_friend_request', {wsFriendRequestSnap})
 
             return res.status(200).json({ message: 'Заявка в друзья подтверждена' });
         } catch (err) {
@@ -408,6 +414,8 @@ class UserController {
             return res.status(500).json({ error: "Ошибка при получении заявок в друзья"});
         }
     }
+
+
 }
 
 module.exports = new UserController()
