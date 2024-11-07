@@ -559,11 +559,9 @@ class UserService {
             }
 
             const matchFilter = {
-                $or: [
-                    { initiator_id: new mongoose.Types.ObjectId(initiatorId) },
-                    { sender_id: new mongoose.Types.ObjectId(senderId) },
-                    { recipient_id: new mongoose.Types.ObjectId(recipientId) }
-                ]
+                initiator_id: new mongoose.Types.ObjectId(initiatorId),
+                sender_id: new mongoose.Types.ObjectId(senderId),
+                recipient_id: new mongoose.Types.ObjectId(recipientId)
             };
 
             const foundRequest = await friendRequest.aggregate([
