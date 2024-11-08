@@ -587,7 +587,7 @@ class UserService {
                         from: 'addresses',
                         localField: 'initiator_id',
                         foreignField: 'user_id',
-                        as: 'address',
+                        as: 'address'
                     }
                 },
                 {
@@ -630,7 +630,7 @@ class UserService {
 
             return foundRequest.length > 0 ? foundRequest[0] : null;
         } catch (err) {
-            console.error("Ошибка при получении одной заявки дружбы и информации о ней");
+            console.error("Ошибка при получении одной заявки О дружбе и информации о ней");
             throw err;
         }
     }
