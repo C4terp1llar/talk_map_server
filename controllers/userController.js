@@ -415,6 +415,28 @@ class UserController {
         }
     }
 
+    async getMutualFriends(req, res) {
+        const { searchUid, page = 1, limit = 10 } = req.body;
+
+        if (!searchUid) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const uid = req.user.uid;
+
+            const isUserExist = await userService.isUserExists(searchUid);
+
+            if (!isUserExist) {
+                return res.status(400).json({ message: 'Пользователь не существует' });
+            }
+
+            const mutual = await userService.getMutualFriendsDetailed(uid, searchUid, true, 'expand', page, limit);
+
+            return res.status(200).json({mutual});
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при получении общих друзей"});
+        }
+    }
 
 }
 

@@ -342,8 +342,11 @@ class UserService {
                 users = await Promise.all(
                     users.map(async (user) => {
                         const mutualSnap = await this.getMutualFriendsDetailed(requesterUid, user._id, false, 'short')
+                        const isIncoming = await this.isIncomingFriendReq(requesterUid, user._id, requesterUid)
+                        const isOutgoing = await this.isOutgoingFriendReq(requesterUid, requesterUid, user._id)
+                        const isFriendship = await this.isFriendshipExists(requesterUid, user._id)
 
-                        return { ...user, mutual: mutualSnap};
+                        return { ...user, mutual: mutualSnap, isIncoming, isOutgoing, isFriendship};
                     })
                 );
             }
@@ -645,13 +648,13 @@ class UserService {
         }
     }
 
-    async getMutualFriendsDetailed(mutualCallerUid, searchingUid, needPagination = false, mode = 'short'){
+    async getMutualFriendsDetailed(mutualCallerUid, searchingUid, needPagination = false, mode = 'short', page = 1, limit = 10){
         try{
             if (mode !== 'short' && mode !== 'expand') {
                 new Error("Отсутствуют обязательные параметры");
             }
 
-            const friendData = await this.getFriends(searchingUid, needPagination);
+            const friendData = await this.getFriends(searchingUid, needPagination, page, limit);
             const friendIds = friendData.foundFriends.map(f => f.friendId);
 
             const mutualFriendsOfMate = await this.getFriendsMutual(friendIds, mutualCallerUid);

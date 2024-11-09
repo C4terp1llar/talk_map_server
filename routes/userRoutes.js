@@ -25,6 +25,7 @@ router.post('/declineFriendRequest',authMiddleware, userController.declineFriend
 router.post('/submitFriendRequest',authMiddleware, userController.submitFriendReq);
 router.post('/deleteFriendship',authMiddleware, userController.deleteFriendship);
 router.post('/getFriendReqs',authMiddleware, userController.getFriendReqs);
+router.post('/getMutualFriends',authMiddleware, userController.getMutualFriends);
 
 
 module.exports = router;
