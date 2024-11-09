@@ -205,7 +205,7 @@ class UserController {
 
         try{
             const requesterUid = req.user.uid
-            const {users, hasMore} = await userService.findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit);
+            const {users, hasMore} = await userService.findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, true);
             res.status(200).json({users, hasMore});
         }catch (err) {
             console.error(err);

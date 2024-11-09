@@ -246,7 +246,7 @@ class UserService {
         }
     }
 
-    async findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit) {
+    async findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, needMutual) {
         try {
             const currentDate = new Date();
             const currentYear = currentDate.getFullYear();
@@ -279,7 +279,7 @@ class UserService {
                 filter.nickname = new RegExp(nicknameFilter, 'i');
             }
 
-            const users = await User.aggregate([
+            let users = await User.aggregate([
                 {
                     $lookup: {
                         from: 'addresses',
@@ -337,6 +337,16 @@ class UserService {
             const hasMore = users.length > limit;
 
             if (hasMore) users.pop();
+
+            if (needMutual) {
+                users = await Promise.all(
+                    users.map(async (user) => {
+                        const mutualSnap = await this.getMutualFriendsDetailed(requesterUid, user._id, false, 'short')
+
+                        return { ...user, mutual: mutualSnap};
+                    })
+                );
+            }
 
             return {
                 users,
@@ -635,8 +645,120 @@ class UserService {
         }
     }
 
+    async getMutualFriendsDetailed(mutualCallerUid, searchingUid, needPagination = false, mode = 'short'){
+        try{
+            if (mode !== 'short' && mode !== 'expand') {
+                new Error("Отсутствуют обязательные параметры");
+            }
 
+            const friendData = await this.getFriends(searchingUid, needPagination);
+            const friendIds = friendData.foundFriends.map(f => f.friendId);
 
+            const mutualFriendsOfMate = await this.getFriendsMutual(friendIds, mutualCallerUid);
+
+            const limitedMutualFriends = mode === 'short' ? mutualFriendsOfMate.slice(0, 3) : mutualFriendsOfMate;
+
+            const detailedMutual =  await User.aggregate([
+                {
+                    $match: {
+                        _id: { $in: limitedMutualFriends }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'avatars',
+                        localField: '_id',
+                        foreignField: 'user_id',
+                        as: 'avatar'
+                    }
+                },
+                { $unwind: { path: '$avatar', preserveNullAndEmptyArrays: true } },
+                {
+                    $project: {
+                        _id: 1,
+                        nickname: 1,
+                        nickname_color: 1,
+                        'avatar.asset_url': 1
+                    }
+                }
+            ]);
+
+            return {
+                mFriends: detailedMutual,
+                amount: mutualFriendsOfMate.length,
+                hasMore: needPagination ? friendData.hasMore : null,
+            }
+        }catch(err){
+            console.error("Ошибка при получении общих друзей c информацией о них");
+            throw err;
+        }
+    }
+
+    async getFriends(searchingUid, needPagination = false, page = 1, limit = 10){
+        try{
+            let pagination;
+            if (needPagination){
+                pagination = [ { $skip: (page - 1) * limit }, { $limit: limit + 1 }]
+            }else{
+                pagination = [];
+            }
+
+            const friendsOfSearchingUser = await Friend.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { user1_id: new mongoose.Types.ObjectId(searchingUid) },
+                            { user2_id: new mongoose.Types.ObjectId(searchingUid) }
+                        ]
+                    }
+                },
+                {
+                    $project: {
+                        friendId: {
+                            $cond: {
+                                if: { $eq: ["$user1_id", new mongoose.Types.ObjectId(searchingUid)] },
+                                then: "$user2_id",
+                                else: "$user1_id"
+                            }
+                        }
+                    }
+                },
+                ...pagination
+            ]);
+
+            const hasMore = needPagination && friendsOfSearchingUser.length > limit;
+
+            if (hasMore) {
+                friendsOfSearchingUser.pop();
+            }
+
+            return {
+                foundFriends: friendsOfSearchingUser,
+                hasMore
+            }
+        }catch(err){
+            console.error("Ошибка при получении друзей");
+            throw err;
+        }
+    }
+
+    async getFriendsMutual (friendIds, mutualCallerUid) {
+        try{
+            const mutualFriends = await Friend.find({
+                $or: [
+                    { user1_id: { $in: friendIds }, user2_id: mutualCallerUid },
+                    { user2_id: { $in: friendIds }, user1_id: mutualCallerUid }
+                ]
+            });
+
+            return mutualFriends.map(friend =>
+                friend.user1_id.equals(mutualCallerUid) ? friend.user2_id : friend.user1_id
+            );
+        }catch(err){
+            console.error("Ошибка при получении общих друзей");
+            throw err;
+        }
+    }
 }
 
 module.exports = new UserService();
