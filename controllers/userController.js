@@ -201,12 +201,12 @@ class UserController {
     }
 
     async findUsers (req, res) {
-        const { cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, page = 1, limit = 10 } = req.body;
+        const { globalSearch, cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, page = 1, limit = 10 } = req.body;
 
         try{
             const requesterUid = req.user.uid
-            const {users, hasMore} = await userService.findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, true);
-            res.status(200).json({users, hasMore});
+            const {users, hasMore} = await userService.findUsers(globalSearch, cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, true);
+            res.status(200).json({users, hasMore, wasGlobal: globalSearch});
         }catch (err) {
             console.error(err);
             return res.status(500).json({error: 'Ошибка при поиске пользователей'});
@@ -406,7 +406,7 @@ class UserController {
                 return res.status(400).json({ message: 'Пользователь не существует' });
             }
 
-            const {friendRequests, hasMore} = await userService.getFriendReqsDetailed(uid, mode, page, limit);
+            const {friendRequests, hasMore} = await userService.getFriendReqsDetailed(true, uid, mode, page, limit);
 
             return res.status(200).json({ requests: friendRequests, hasMore: hasMore });
         } catch (err) {
@@ -434,7 +434,7 @@ class UserController {
             return res.status(200).json({mutual});
         } catch (err) {
             console.error(err);
-            return res.status(500).json({ error: "Ошибка при получении общих друзей"});
+            return res.status(500).json({ error: "Ошибка при получении общих друзей"})
         }
     }
 

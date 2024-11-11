@@ -22,7 +22,7 @@ class UserService {
             if (mode && mode === 'external'){
                 excludeString = '-email -password -__v'
             }else{
-                excludeString = '-password -_id -__v'
+                excludeString = '-password -__v'
             }
 
             const mainData = await User.findById(uid).select(excludeString).lean();
@@ -246,7 +246,7 @@ class UserService {
         }
     }
 
-    async findUsers(cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, needMutual) {
+    async findUsers(globalSearch, cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, needMutual) {
         try {
             const currentDate = new Date();
             const currentYear = currentDate.getFullYear();
@@ -256,6 +256,27 @@ class UserService {
             // исключить пользователя который запрашивает
             if (requesterUid) {
                 filter._id = { $ne: new mongoose.Types.ObjectId(requesterUid) };
+            }
+
+            if (globalSearch) {
+                const { foundFriends } = await this.getFriends(requesterUid);
+                const friendIds = foundFriends.map(friend => new mongoose.Types.ObjectId(friend.friendId));
+
+                friendIds.push(new mongoose.Types.ObjectId(requesterUid));
+
+                if (friendIds.length > 0) {
+                    filter._id = { $nin: friendIds };
+                }
+            }else{
+                const { foundFriends } = await this.getFriends(requesterUid);
+
+                needMutual = false;
+
+                const friendIds = foundFriends.map(friend => new mongoose.Types.ObjectId(friend.friendId));
+
+                if (friendIds.length > 0) {
+                    filter._id = { $in: friendIds };
+                }
             }
 
             // если передан пол
@@ -334,9 +355,11 @@ class UserService {
                 }
             ]);
 
+
             const hasMore = users.length > limit;
 
             if (hasMore) users.pop();
+
 
             if (needMutual) {
                 users = await Promise.all(
@@ -344,12 +367,12 @@ class UserService {
                         const mutualSnap = await this.getMutualFriendsDetailed(requesterUid, user._id, false, 'short')
                         const isIncoming = await this.isIncomingFriendReq(requesterUid, user._id, requesterUid)
                         const isOutgoing = await this.isOutgoingFriendReq(requesterUid, requesterUid, user._id)
-                        const isFriendship = await this.isFriendshipExists(requesterUid, user._id)
 
-                        return { ...user, mutual: mutualSnap, isIncoming, isOutgoing, isFriendship};
+                        return { ...user, mutual: mutualSnap, isIncoming, isOutgoing};
                     })
                 );
             }
+
 
             return {
                 users,
@@ -467,7 +490,7 @@ class UserService {
         }
     }
 
-    async getFriendReqsDetailed (uid, mode, page = 1, limit = 10) {
+    async getFriendReqsDetailed (needMutual, uid, mode, page = 1, limit = 10) {
         try {
             const matchFilter = {};
 
@@ -479,7 +502,7 @@ class UserService {
                 new Error("Некорректный mode");
             }
 
-            const friendRequests = await friendRequest.aggregate([
+            let friendRequests = await friendRequest.aggregate([
                 {
                     $match: matchFilter
                 },
@@ -553,6 +576,16 @@ class UserService {
 
             if (hasMore) {
                 friendRequests.pop();
+            }
+
+            if (needMutual) {
+                friendRequests = await Promise.all(
+                    friendRequests.map(async (req) => {
+                        const mutualSnap = await this.getMutualFriendsDetailed(mode === 'incoming' ? req.recipient_id : req.sender_id, mode === 'incoming' ? req.sender_id : req.recipient_id, false, 'short')
+
+                        return { ...req, mutual: mutualSnap};
+                    })
+                );
             }
 
             return {

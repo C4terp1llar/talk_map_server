@@ -1,4 +1,5 @@
 const authService = require('../services/authService');
+const jwt = require('jsonwebtoken');
 
 const bcrypt = require('bcrypt');
 const JwtService = require("../services/jwtService");
@@ -15,23 +16,24 @@ class AuthController {
             const currentUser = await authService.getUser(email);
             // Если юзера по имаилу нет
             if (!currentUser) {
-                return res.status(400).json({ login: false, message: 'Пользователя с таким email не существует' });
+                return res.status(400).json({ login: false, message: 'Неверный логин или пароль' });
             }
 
             const { _id: uid, password: currentPassword, nickname } = currentUser;
 
             // сравниваю хешир пароль с паролем из реквеста
             const match = await bcrypt.compare(password, currentPassword);
-
             if (!match) {
-                return res.status(400).json({ login: false, message: 'Неверный пароль' });
+                return res.status(400).json({ login: false, message: 'Неверный логин или пароль' });
             }
+
             // перед проверкой рефреш токена по ине о девайсе сразу чищу все истеккшие рефреш токены для юида
             await JwtService.clearExpiredTokens(uid);
             // пробую доставть рефреш токен по иные об устройстве если он есть
             const refreshTokenForCurrentDevice = await JwtService.getRefreshTokenByDevice(uid, device_info);
 
             const accessToken = JwtService.createAccessToken({ uid, email, device_info });
+
             let refreshToken;
             // если по итогу токена по инфе об устройстве не нашел то делаю неовый токен с новой инфой об устройстве
             if (!refreshTokenForCurrentDevice) {
@@ -60,7 +62,7 @@ class AuthController {
         const refreshToken = req.cookies.refresh_token;
 
         if (!refreshToken) {
-            return res.status(401).json({ error: 'Нехватает данных или данные некорректны' });
+            return res.status(403).json({ error: 'Нехватает данных или данные некорректны' });
         }
 
         try {
@@ -91,21 +93,14 @@ class AuthController {
         try {
             const { uid, email, device_info } = JwtService.verifyRefreshToken(refreshToken);
 
-            // очистка истекших рефрешей
-            await JwtService.clearExpiredTokens(uid);
-
-            // сравнение рефреша из реквеста и рефреша из бд
-            const refreshTokenFromDb = await JwtService.getRefreshTokenByDevice(uid, device_info);
-
-            if (!refreshTokenFromDb || refreshTokenFromDb.token !== refreshToken) {
-                return res.status(403).json({ error: 'Неверный refresh токен' });
-            }
-
-            await JwtService.deleteRefreshToken(uid, device_info)
+            await Promise.all([
+                JwtService.deleteRefreshToken(uid, device_info),
+                JwtService.clearExpiredTokens(uid)
+            ])
 
             const newAccessToken = JwtService.createAccessToken({ uid, email, device_info });
-
             const newRefreshToken = JwtService.createRefreshToken({ uid, email, device_info });
+
             await RegistrationService.saveRefreshToken(uid, newRefreshToken, device_info)
 
             res.cookie('refresh_token', newRefreshToken, {
@@ -114,12 +109,12 @@ class AuthController {
                 sameSite: 'None',
             });
 
-            res.json({ accessToken: newAccessToken });
+            res.status(200).json({ accessToken: newAccessToken });
         } catch (err) {
-            if (err.name === 'TokenExpiredError') {
-                return res.status(401).json({ error: 'Токен истек, релогин' });
-            } else if (err.name === 'JsonWebTokenError') {
-                return res.status(403).json({ error: 'Неверный токен, релогин' });
+            if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {
+                const {uid, device_info} = jwt.decode(refreshToken)
+                await JwtService.deleteRefreshToken(uid, device_info)
+                return res.status(403).json({ error: 'Токен истек или неверен, релогин' });
             } else {
                 console.error(err);
                 return res.status(500).json({ error: 'Ошибка при синхронизации данных' });
@@ -129,26 +124,11 @@ class AuthController {
 
 
     async sync(req, res) {
-
-        const token = req.headers.authorization?.split(' ')[1];
-
-        if (!token) {
-            return res.status(401).json({ error: 'Токен отсутствует' });
-        }
-
         try {
-            JwtService.verifyAccessToken(token);
-
             res.status(200).json({message: 'ok'})
         } catch (err) {
-            if (err.name === 'TokenExpiredError') {
-                return res.status(401).json({ error: 'Токен истек, рефреш' });
-            } else if (err.name === 'JsonWebTokenError') {
-                return res.status(403).json({ error: 'Неверный токен, релогин' });
-            } else {
-                console.error(err);
-                return res.status(500).json({ error: 'Ошибка при синхронизации данных' });
-            }
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при синхронизации данных' });
         }
     }
 

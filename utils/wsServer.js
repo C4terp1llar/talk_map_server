@@ -23,10 +23,6 @@ class WsServer {
             // базовая обработка 'connection', внутри => 'disconnect' + 'connect_error'
             wsBaseController.connect(socket, this.connectedSockets);
 
-
-            socket.on("custom_event", () => {
-                console.log("custom_event", socket.id, this.connectedSockets);
-            });
         });
     }
 
