@@ -598,7 +598,7 @@ class UserService {
         }
     };
 
-    async getOneFriendReqDetailed(initiatorId, senderId, recipientId) {
+    async getOneFriendReqDetailed(needMutual, initiatorId, senderId, recipientId) {
         try {
             if (!initiatorId || !senderId || !recipientId) {
                 new Error("Отсутствуют обязательные параметры");
@@ -610,7 +610,7 @@ class UserService {
                 recipient_id: new mongoose.Types.ObjectId(recipientId)
             };
 
-            const foundRequest = await friendRequest.aggregate([
+            let foundRequest = await friendRequest.aggregate([
                 {
                     $match: matchFilter
                 },
@@ -673,6 +673,16 @@ class UserService {
                     }
                 }
             ]);
+
+            if (needMutual) {
+                foundRequest = await Promise.all(
+                    foundRequest.map(async (req) => {
+                        const mutualSnap = await this.getMutualFriendsDetailed(senderId, recipientId, false, 'short')
+
+                        return { ...req, mutual: mutualSnap};
+                    })
+                );
+            }
 
             return foundRequest.length > 0 ? foundRequest[0] : null;
         } catch (err) {
@@ -792,6 +802,72 @@ class UserService {
             );
         }catch(err){
             console.error("Ошибка при получении общих друзей");
+            throw err;
+        }
+    }
+
+    async getOneFriendById(requesterUid, targetUid, needMutual = false){
+        try {
+            const filter = { _id: new mongoose.Types.ObjectId(targetUid) };
+
+            let user = await User.aggregate([
+                { $match: filter },
+                {
+                    $lookup: {
+                        from: 'addresses',
+                        localField: '_id',
+                        foreignField: 'user_id',
+                        as: 'address',
+                    }
+                },
+                {
+                    $unwind: {
+                        path: '$address',
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'avatars',
+                        localField: '_id',
+                        foreignField: 'user_id',
+                        as: 'avatar',
+                    },
+                },
+                {
+                    $unwind: {
+                        path: '$avatar',
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $project: {
+                        nickname: 1,
+                        nickname_color: 1,
+                        gender: 1,
+                        b_date: 1,
+                        'address.city': 1,
+                        'address.country': 1,
+                        'address.country_code': 1,
+                        'avatar.asset_url': 1
+                    }
+                }
+            ]);
+
+            if (user.length === 0) {
+                return null;
+            }
+
+            if (needMutual) {
+                user.mutual = await this.getMutualFriendsDetailed(requesterUid, targetUid, false, 'short');
+                user.isIncoming = await this.isIncomingFriendReq(requesterUid, targetUid, requesterUid);
+                user.isOutgoing = await this.isOutgoingFriendReq(requesterUid, requesterUid, targetUid);
+            }
+
+            return user;
+
+        } catch (err) {
+            console.error("Ошибка при поиске пользователя по ID");
             throw err;
         }
     }

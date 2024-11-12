@@ -279,7 +279,7 @@ class UserController {
 
             await userService.createFriendReq(sender_id, sender_id, recipient_id);
 
-            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(sender_id, sender_id, recipient_id)
+            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(true, sender_id, sender_id, recipient_id)
             wsServer.emitToUser(recipient_id, 'receive_friend_request', {wsFriendRequestSnap})
 
             return res.status(200).json({ message: 'ok' });
@@ -303,7 +303,7 @@ class UserController {
                 return res.status(400).json({ message: 'Пользователь не существует' });
             }
 
-            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(sender_id, sender_id, recipient_id)
+            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(false, sender_id, sender_id, recipient_id)
 
             await userService.deleteFriendReq(sender_id, sender_id, recipient_id);
 
@@ -330,7 +330,7 @@ class UserController {
                 return res.status(400).json({ message: 'Пользователь не существует' });
             }
 
-            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(sender_id, sender_id, recipient_id)
+            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(false, sender_id, sender_id, recipient_id)
 
             await userService.deleteFriendReq(sender_id, sender_id, recipient_id);
 
@@ -360,7 +360,7 @@ class UserController {
 
             await userService.createFriendship(sender_id, recipient_id);
 
-            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(sender_id, sender_id, recipient_id)
+            const wsFriendRequestSnap = await userService.getOneFriendReqDetailed(false, sender_id, sender_id, recipient_id)
 
             await userService.deleteFriendReq(sender_id, sender_id, recipient_id);
 
@@ -432,6 +432,29 @@ class UserController {
             const mutual = await userService.getMutualFriendsDetailed(uid, searchUid, true, 'expand', page, limit);
 
             return res.status(200).json({mutual});
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при получении общих друзей"})
+        }
+    }
+
+    async getOneFriend(req, res) {
+        const { targetUid, needMutual } = req.body;
+
+        if (!targetUid) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const requesterUid = req.user.uid;
+
+            const isUserExist = await userService.isUserExists(targetUid);
+
+            if (!isUserExist) {
+                return res.status(400).json({ message: 'Пользователь не существует' });
+            }
+
+            const user = await userService.getOneFriendById(requesterUid, targetUid, needMutual)
+
+            return res.status(200).json({user});
         } catch (err) {
             console.error(err);
             return res.status(500).json({ error: "Ошибка при получении общих друзей"})
