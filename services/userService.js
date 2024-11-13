@@ -696,7 +696,6 @@ class UserService {
             if (mode !== 'short' && mode !== 'expand') {
                 new Error("Отсутствуют обязательные параметры");
             }
-
             const friendData = await this.getFriends(searchingUid, needPagination, page, limit);
             const friendIds = friendData.foundFriends.map(f => f.friendId);
 
@@ -743,6 +742,7 @@ class UserService {
     async getFriends(searchingUid, needPagination = false, page = 1, limit = 10){
         try{
             let pagination;
+
             if (needPagination){
                 pagination = [ { $skip: (page - 1) * limit }, { $limit: limit + 1 }]
             }else{
@@ -790,6 +790,10 @@ class UserService {
 
     async getFriendsMutual (friendIds, mutualCallerUid) {
         try{
+
+            const friendData = await this.getFriends(mutualCallerUid, false);
+            const friendIds = friendData.foundFriends.map(f => f.friendId);
+
             const mutualFriends = await Friend.find({
                 $or: [
                     { user1_id: { $in: friendIds }, user2_id: mutualCallerUid },
