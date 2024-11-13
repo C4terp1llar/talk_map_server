@@ -12,6 +12,7 @@ const Friend = require("../models/friendModel");
 const mongoose = require('mongoose');
 
 const axios = require('axios');
+const {_logFunc} = require("nodemailer/lib/shared");
 
 class UserService {
     async getUserInfo(uid, mode) {
@@ -260,22 +261,19 @@ class UserService {
 
             if (globalSearch) {
                 const { foundFriends } = await this.getFriends(requesterUid);
-                const friendIds = foundFriends.map(friend => new mongoose.Types.ObjectId(friend.friendId));
 
-                friendIds.push(new mongoose.Types.ObjectId(requesterUid));
+                foundFriends.push(new mongoose.Types.ObjectId(requesterUid));
 
-                if (friendIds.length > 0) {
-                    filter._id = { $nin: friendIds };
+                if (foundFriends.length > 0) {
+                    filter._id = { $nin: foundFriends };
                 }
             }else{
                 const { foundFriends } = await this.getFriends(requesterUid);
 
                 needMutual = false;
 
-                const friendIds = foundFriends.map(friend => new mongoose.Types.ObjectId(friend.friendId));
-
-                if (friendIds.length > 0) {
-                    filter._id = { $in: friendIds };
+                if (foundFriends.length > 0) {
+                    filter._id = { $in: foundFriends };
                 }
             }
 
@@ -359,7 +357,6 @@ class UserService {
             const hasMore = users.length > limit;
 
             if (hasMore) users.pop();
-
 
             if (needMutual) {
                 users = await Promise.all(
@@ -691,17 +688,17 @@ class UserService {
         }
     }
 
-    async getMutualFriendsDetailed(mutualCallerUid, searchingUid, needPagination = false, mode = 'short', page = 1, limit = 10){
+    async getMutualFriendsDetailed(mutualCallerUid, searchingUid, needPagination = false, mode = 'short', page, limit){
         try{
             if (mode !== 'short' && mode !== 'expand') {
                 new Error("Отсутствуют обязательные параметры");
             }
-            const friendData = await this.getFriends(searchingUid, needPagination, page, limit);
-            const friendIds = friendData.foundFriends.map(f => f.friendId);
 
-            const mutualFriendsOfMate = await this.getFriendsMutual(friendIds, mutualCallerUid);
+            const {foundFriends} = await this.getFriends(searchingUid);
 
-            const limitedMutualFriends = mode === 'short' ? mutualFriendsOfMate.slice(0, 3) : mutualFriendsOfMate;
+            const {mutualFriends, hasMore} = await this.getFriendsMutual(foundFriends, mutualCallerUid, needPagination, page, limit);
+
+            const limitedMutualFriends = mode === 'short' ? mutualFriends.slice(0, 3) : mutualFriends;
 
             const detailedMutual =  await User.aggregate([
                 {
@@ -730,24 +727,16 @@ class UserService {
 
             return {
                 mFriends: detailedMutual,
-                amount: mutualFriendsOfMate.length,
-                hasMore: needPagination ? friendData.hasMore : null,
+                amount: mutualFriends.length,
+                hasMore: needPagination ? hasMore : null,
             }
         }catch(err){
             console.error("Ошибка при получении общих друзей c информацией о них");
             throw err;
         }
     }
-
-    async getFriends(searchingUid, needPagination = false, page = 1, limit = 10){
+    async getFriends(searchingUid){
         try{
-            let pagination;
-
-            if (needPagination){
-                pagination = [ { $skip: (page - 1) * limit }, { $limit: limit + 1 }]
-            }else{
-                pagination = [];
-            }
 
             const friendsOfSearchingUser = await Friend.aggregate([
                 {
@@ -766,21 +755,16 @@ class UserService {
                                 then: "$user2_id",
                                 else: "$user1_id"
                             }
-                        }
+                        },
+                        '_id': 0
                     }
                 },
-                ...pagination
             ]);
 
-            const hasMore = needPagination && friendsOfSearchingUser.length > limit;
-
-            if (hasMore) {
-                friendsOfSearchingUser.pop();
-            }
+            const foundFriends = friendsOfSearchingUser.map(f => f.friendId)
 
             return {
-                foundFriends: friendsOfSearchingUser,
-                hasMore
+                foundFriends
             }
         }catch(err){
             console.error("Ошибка при получении друзей");
@@ -788,22 +772,44 @@ class UserService {
         }
     }
 
-    async getFriendsMutual (friendIds, mutualCallerUid) {
+    async getFriendsMutual (friendIds, mutualCallerUid, needPagination, page, limit) {
         try{
 
-            const friendData = await this.getFriends(mutualCallerUid, false);
-            const friendIds = friendData.foundFriends.map(f => f.friendId);
+            let pagination;
 
-            const mutualFriends = await Friend.find({
-                $or: [
-                    { user1_id: { $in: friendIds }, user2_id: mutualCallerUid },
-                    { user2_id: { $in: friendIds }, user1_id: mutualCallerUid }
-                ]
-            });
+            if (needPagination){
+                pagination = [ { $skip: (page - 1) * limit }, { $limit: limit + 1 }]
+            }else{
+                pagination = [];
+            }
 
-            return mutualFriends.map(friend =>
+            let mutualFriends = await Friend.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { user1_id: { $in: friendIds }, user2_id: new mongoose.Types.ObjectId(mutualCallerUid) },
+                            { user2_id: { $in: friendIds }, user1_id: new mongoose.Types.ObjectId(mutualCallerUid) }
+                        ],
+                    },
+                },
+                ...pagination
+            ]);
+
+
+            mutualFriends = mutualFriends.map(friend =>
                 friend.user1_id.equals(mutualCallerUid) ? friend.user2_id : friend.user1_id
             );
+
+            const hasMore = needPagination && mutualFriends.length > limit;
+
+            if (hasMore) {
+                mutualFriends.pop();
+            }
+
+            return {
+                mutualFriends,
+                hasMore
+            }
         }catch(err){
             console.error("Ошибка при получении общих друзей");
             throw err;
