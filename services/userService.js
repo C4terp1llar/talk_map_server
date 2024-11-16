@@ -274,6 +274,11 @@ class UserService {
 
                 if (foundFriends.length > 0) {
                     filter._id = { $in: foundFriends };
+                }else{
+                    return {
+                        users: [],
+                        hasMore: false
+                    };
                 }
             }
 
