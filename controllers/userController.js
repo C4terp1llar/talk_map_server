@@ -201,10 +201,10 @@ class UserController {
     }
 
     async findUsers (req, res) {
-        const { globalSearch, cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, page = 1, limit = 10 } = req.body;
+        const { globalSearch, cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, page = 1, limit = 10, requester} = req.body;
 
         try{
-            const requesterUid = req.user.uid
+            const requesterUid = requester ? requester : req.user.uid
             const {users, hasMore} = await userService.findUsers(globalSearch, cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, true);
             res.status(200).json({users, hasMore, wasGlobal: globalSearch});
         }catch (err) {
