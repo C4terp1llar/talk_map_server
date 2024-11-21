@@ -3,6 +3,7 @@ const ImgService = require('../services/imgService')
 const wsServer = require('../utils/wsServer')
 
 class UserController {
+
     async getMainUserInfo (req, res) {
         try{
             const uid = req.user.uid
