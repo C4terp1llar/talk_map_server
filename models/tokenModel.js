@@ -28,6 +28,9 @@ const TokenSchema = new mongoose.Schema({
     }
 });
 
-const Token= mongoose.model('Token', TokenSchema);
+TokenSchema.index({ user_id: 1 });
+TokenSchema.index({ user_id: 1, device: 1 });
+
+const Token = mongoose.model('Token', TokenSchema);
 
 module.exports = Token;
