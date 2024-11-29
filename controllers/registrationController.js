@@ -151,7 +151,7 @@ class RegistrationController {
         if (!email || !password || !nickname || !date_b || !gender || !avatar || !address || !device_info) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
         try{
-            const userBDate = new Date(date_b)
+            const userBDate = new Date(date_b);
 
             const userGender = gender === 'Мужской' ? 'male' : 'female';
 
