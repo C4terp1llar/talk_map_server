@@ -247,7 +247,7 @@ class UserService {
         }
     }
 
-    async findUsers(globalSearch, cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, needMutual) {
+    async findUsers(globalSearch, cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, needMutual, sortBy) {
         try {
             const currentDate = new Date();
             const currentYear = currentDate.getFullYear();
@@ -303,6 +303,16 @@ class UserService {
                 filter.nickname = new RegExp(nicknameFilter, 'i');
             }
 
+            // сортировка
+            let sort = {};
+            if (sortBy) {
+                if (sortBy.includes('age_asc')) {
+                    sort.b_date = -1;
+                } else if (sortBy.includes('age_desc')) {
+                    sort.b_date = 1;
+                }
+            }
+
             let users = await User.aggregate([
                 {
                     $lookup: {
@@ -350,6 +360,7 @@ class UserService {
                         'avatar.asset_url': 1
                     },
                 },
+                ...(sortBy.length ? [{ $sort: sort }] : []),
                 {
                     $skip: (page - 1) * limit,
                 },
@@ -373,6 +384,10 @@ class UserService {
                         return { ...user, mutual: mutualSnap, isIncoming, isOutgoing};
                     })
                 );
+
+                if (sortBy.includes('age_') === false){
+                    users.sort((a, b) => b.mutual.amount - a.mutual.amount);
+                }
             }
 
 
