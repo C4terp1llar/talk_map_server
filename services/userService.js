@@ -247,7 +247,7 @@ class UserService {
         }
     }
 
-    async findUsers(globalSearch, cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, needMutual, sortBy) {
+    async findUsers(globalSearch, cityFilter, minAgeFilter, maxAgeFilter, genderFilter, nicknameFilter, requesterUid, page, limit, needMutual, sortBy = '') {
         try {
             const currentDate = new Date();
             const currentYear = currentDate.getFullYear();
@@ -305,7 +305,7 @@ class UserService {
 
             // сортировка
             let sort = {};
-            if (sortBy) {
+            if (sortBy.length) {
                 if (sortBy.includes('age_asc')) {
                     sort.b_date = -1;
                 } else if (sortBy.includes('age_desc')) {
@@ -385,7 +385,7 @@ class UserService {
                     })
                 );
 
-                if (sortBy.includes('age_') === false){
+                if (!sortBy.includes('age_')){
                     users.sort((a, b) => b.mutual.amount - a.mutual.amount);
                 }
             }
