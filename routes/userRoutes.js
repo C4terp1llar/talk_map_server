@@ -19,6 +19,7 @@ router.post('/deleteTag',authMiddleware, userController.deleteUserTag);
 router.post('/isUserExist',authMiddleware, userController.isUserExist);
 router.post('/findUsers',authMiddleware, userController.findUsers);
 router.post('/getExternalUserMainInfo',authMiddleware, userController.getMainExternalUserInfo);
+router.get('/friendsReqsAmount',authMiddleware, userController.getFriendsReqsAmount);
 router.post('/sendFriendRequest',authMiddleware, userController.sendFriendRequest);
 router.post('/cancelFriendRequest',authMiddleware, userController.cancelFriendRequest);
 router.post('/declineFriendRequest',authMiddleware, userController.declineFriendRequest);

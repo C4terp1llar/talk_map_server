@@ -8,7 +8,7 @@ const RegistrationService = require("../services/registrationService");
 class AuthController {
     async login(req, res) {
         const { email, password, device_info } = req.body;
-        console.log(email, password, device_info)
+
         if (!email || !password || !device_info) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
         try{

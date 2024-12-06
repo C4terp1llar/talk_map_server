@@ -8,12 +8,13 @@ class UserController {
         try{
             const uid = req.user.uid
 
-            const [mainInfo, addressInfo] = await Promise.all([
+            const [mainInfo, addressInfo, reqsAmount] = await Promise.all([
                 userService.getUserInfo(uid),
-                userService.getUserAddress(uid)
+                userService.getUserAddress(uid),
+                userService.getReqsAmount(uid)
             ]);
 
-            res.status(200).json({main: mainInfo, address: addressInfo});
+            res.status(200).json({main: mainInfo, address: addressInfo, rsAmount: reqsAmount});
         }catch(err){
             console.error(err);
             return res.status(500).json({error: 'Ошибка получении информации о пользователе'});
@@ -459,6 +460,17 @@ class UserController {
         } catch (err) {
             console.error(err);
             return res.status(500).json({ error: "Ошибка при получении общих друзей"})
+        }
+    }
+
+    async getFriendsReqsAmount (req, res) {
+        try{
+            const uid = req.user.uid;
+            const amount = await userService.getReqsAmount(uid)
+            return res.status(200).json({amount});
+        }catch (err){
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при получении количества заявок"})
         }
     }
 

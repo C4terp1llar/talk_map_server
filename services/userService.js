@@ -12,7 +12,6 @@ const Friend = require("../models/friendModel");
 const mongoose = require('mongoose');
 
 const axios = require('axios');
-const {_logFunc} = require("nodemailer/lib/shared");
 
 class UserService {
     async getUserInfo(uid, mode) {
@@ -898,6 +897,18 @@ class UserService {
 
         } catch (err) {
             console.error("Ошибка при поиске пользователя по ID");
+            throw err;
+        }
+    }
+
+    async getReqsAmount (uid) {
+        if (!mongoose.Types.ObjectId.isValid(uid)) throw new Error('Не передан uid');
+
+        try{
+            const count = await friendRequest.countDocuments({ recipient_id: uid });
+            return count > 0 ? count : null;
+        }catch(err){
+            console.error("Ошибка получении общего кол-ва заявко в друзья для пользователя");
             throw err;
         }
     }
