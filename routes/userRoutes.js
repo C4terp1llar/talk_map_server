@@ -3,6 +3,7 @@ const router = express.Router();
 
 const authMiddleware = require('../middleware/authMiddleware');
 const userController = require('../controllers/userController');
+const mediaController = require('../controllers/mediaController');
 
 router.get('/getUserMainInfo',authMiddleware, userController.getMainUserInfo);
 router.post('/setWallpaper',authMiddleware, userController.setUserWallpaper);
@@ -28,6 +29,8 @@ router.post('/deleteFriendship',authMiddleware, userController.deleteFriendship)
 router.post('/getFriendReqs',authMiddleware, userController.getFriendReqs);
 router.post('/getMutualFriends',authMiddleware, userController.getMutualFriends);
 router.post('/getOneFriend',authMiddleware, userController.getOneFriend);
+
+router.post('/uploadMedia',authMiddleware, mediaController.uploadMedia);
 
 
 module.exports = router;
