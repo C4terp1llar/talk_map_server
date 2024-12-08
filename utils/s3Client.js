@@ -5,7 +5,7 @@ const s3Client = new S3Client({
     endpoint: 'https://storage.yandexcloud.net',
     credentials: {
         accessKeyId: 'YCAJEEa2HmjRVuc8dA4Yvfk_Q',
-        secretAccessKey: 'YCNSMELg_Dblp9uyFZVtIW48VumZBxCyxcXXb_69',
+        secretAccessKey: 'YCNSMELg_Dblp9uyFZVtIW48VumZBxCyxcXXb_69'
     },
 });
 
