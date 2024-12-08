@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.705.0",
+    "@types/whatwg-url": "^13.0.0",
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.5.0",
