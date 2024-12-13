@@ -45,7 +45,7 @@ class MediaController {
                 medias.map((media) => MediaService.createPhoto(requester, media._id, media.store_url))
             );
 
-            return res.status(200).json({ photos: createdPhotos });
+            return res.status(201).json({ photos: createdPhotos });
         } catch (err) {
             console.error(err.message);
             return res.status(500).json({ error: 'Ошибка при создании фото' });
@@ -75,6 +75,19 @@ class MediaController {
         }
     }
 
+    async deletePhoto(req, res) {
+        const { photoId } = req.query;
+
+        if (!photoId) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            await MediaService.deletePhoto(photoId);
+            res.status(204).json({ status: 'ok' });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при удалении фотографии' });
+        }
+    }
 
 }
 

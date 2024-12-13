@@ -1,6 +1,6 @@
 const fs = require('fs');
-const { PutObjectCommand } = require('@aws-sdk/client-s3');
-const { v4: uuidv4 } = require('uuid');
+const {PutObjectCommand, DeleteObjectCommand} = require('@aws-sdk/client-s3');
+const {v4: uuidv4} = require('uuid');
 const s3Client = require('../utils/s3Client');
 const normalizeFileName = require('../utils/normalizeFile');
 
@@ -49,7 +49,14 @@ class MediaService {
 
     async createMedia(user_id, client_filename, client_file_type, client_file_size, store_filename, store_url) {
         try {
-            const media = new Media({ user_id, client_filename, client_file_type, client_file_size, store_filename, store_url });
+            const media = new Media({
+                user_id,
+                client_filename,
+                client_file_type,
+                client_file_size,
+                store_filename,
+                store_url
+            });
             return await media.save();
         } catch (err) {
             console.error("Ошибка при создании медиа");
@@ -59,7 +66,7 @@ class MediaService {
 
     async createPhoto(user_id, media_id, url) {
         try {
-            const photo = new Photo({ user_id, media_id, url });
+            const photo = new Photo({user_id, media_id, url});
             return await photo.save();
         } catch (err) {
             console.error("Ошибка при создании фото");
@@ -70,7 +77,7 @@ class MediaService {
     async getPhotos(user_id, page = 1, limit = 10) {
         try {
             const photos = await Photo.aggregate([
-                { $match: { user_id: new mongoose.Types.ObjectId(user_id) } },
+                {$match: {user_id: new mongoose.Types.ObjectId(user_id)}},
                 {
                     $lookup: {
                         from: 'media',
@@ -79,7 +86,7 @@ class MediaService {
                         as: 'media',
                     },
                 },
-                { $unwind: '$media' },
+                {$unwind: '$media'},
                 {
                     $project: {
                         _id: 1,
@@ -97,6 +104,9 @@ class MediaService {
                 },
                 {
                     $limit: limit + 1,
+                },
+                {
+                    $sort: {'media.createdAt': -1}
                 }
             ]);
 
@@ -110,6 +120,28 @@ class MediaService {
 
         } catch (err) {
             console.error("Ошибка при получении всех фотографий");
+            throw err;
+        }
+    }
+
+    async deletePhoto(photoId) {
+        try {
+            const photo = await Photo.findById(photoId);
+            const media = await Media.findById(photo.media_id);
+
+            const objectKey = media.store_filename;
+            await s3Client.send(new DeleteObjectCommand({
+                Bucket: 'talkmap-multimedia-storage',
+                Key: objectKey,
+            }));
+
+            await Promise.all([
+                Photo.deleteOne({_id: photoId}),
+                Media.deleteOne({_id: media._id})
+            ])
+
+        } catch (err) {
+            console.error("Ошибка при удалении фото:", err);
             throw err;
         }
     }

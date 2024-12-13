@@ -34,6 +34,7 @@ router.post('/uploadMedia',authMiddleware, mediaController.createPhoto);
 
 router.post('/photo',authMiddleware, mediaController.createPhoto);
 router.get('/photo',authMiddleware, mediaController.getPhotos);
+router.delete('/photo',authMiddleware, mediaController.deletePhoto);
 
 
 module.exports = router;
