@@ -30,7 +30,10 @@ router.post('/getFriendReqs',authMiddleware, userController.getFriendReqs);
 router.post('/getMutualFriends',authMiddleware, userController.getMutualFriends);
 router.post('/getOneFriend',authMiddleware, userController.getOneFriend);
 
-router.post('/uploadMedia',authMiddleware, mediaController.uploadMedia);
+router.post('/uploadMedia',authMiddleware, mediaController.createPhoto);
+
+router.post('/photo',authMiddleware, mediaController.createPhoto);
+router.get('/photo',authMiddleware, mediaController.getPhotos);
 
 
 module.exports = router;

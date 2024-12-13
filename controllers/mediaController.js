@@ -2,39 +2,80 @@ const formidable = require('formidable');
 const MediaService = require('../services/mediaService');
 
 class MediaController {
-    async uploadMedia(req, res) {
+    async createPhoto(req, res) {
+        const requester = req.user.uid;
+
         const form = new formidable.IncomingForm({
             multiples: true,
             uploadDir: './uploads',
             keepExtensions: true,
         });
 
-        const uuid = req.user.uid;
-
-        await form.parse(req, async (err, fields, files) => {
-            if (err) {
-                return res.status(500).json({message: "Ошибка при обработке формы", error: err});
-            }
-
-            try {
-                const uploadPromises = Object.values(files).flat().map((file) => {
-                    return MediaService.uploadToS3(file, uuid);
+        try {
+            const { fields, files } = await new Promise((resolve, reject) => {
+                form.parse(req, (err, fields, files) => {
+                    if (err) return reject(err);
+                    resolve({ fields, files });
                 });
+            });
 
-                const uploadResults = await Promise.all(uploadPromises);
-                const successfulUploads = uploadResults.filter(result => result !== null);
-
-                if (successfulUploads.length === 0) {
-                    return res.status(500).json({message: "Не удалось загрузить файлы."});
-                }
-
-                res.status(200).json({files: successfulUploads});
-            } catch (err) {
-                console.error(err);
-                res.status(500).json({error: 'Ошибка при загрузке файлов на S3'});
+            const { sender } = fields;
+            if (!sender.length || sender[0] !== 'photo' || !Object.keys(files).length) {
+                return res.status(400).json({ error: 'Некорректные данные или отсутствуют файлы.' });
             }
-        });
+
+            const uploads = await Promise.all(
+                Object.values(files).flat().map((file) => MediaService.uploadToS3(file, requester))
+            );
+
+            const medias = await Promise.all(
+                uploads.map((upload) =>
+                    MediaService.createMedia(
+                        requester,
+                        upload.client_filename,
+                        upload.client_file_type,
+                        upload.client_file_size,
+                        upload.store_filename,
+                        upload.store_url
+                    )
+                )
+            );
+
+            const createdPhotos = await Promise.all(
+                medias.map((media) => MediaService.createPhoto(requester, media._id, media.store_url))
+            );
+
+            return res.status(200).json({ photos: createdPhotos });
+        } catch (err) {
+            console.error(err.message);
+            return res.status(500).json({ error: 'Ошибка при создании фото' });
+        }
     }
+
+    async getPhotos(req, res) {
+        const { mode, searchUid, page = 1, limit = 10 } = req.query;
+
+        if (mode !== 'external' && mode !== 'internal') {
+            return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+        }
+
+        try {
+            const uid = mode === 'internal' ? req.user.uid : searchUid;
+
+            if (!uid) {
+                return res.status(400).json({ error: 'Нехватает данных о пользователе.' });
+            }
+
+            const { photos, hasMore } = await MediaService.getPhotos(uid, +page, +limit);
+
+            res.status(200).json({ photos, hasMore });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при получении фотографий' });
+        }
+    }
+
+
 }
 
 module.exports = new MediaController();
