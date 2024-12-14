@@ -89,6 +89,25 @@ class MediaController {
         }
     }
 
+    async isPhotoExists(req, res) {
+        const { photoId, userId } = req.query;
+
+        if (!photoId || !userId) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const exist = await MediaService.isPhotoExists(photoId, userId);
+
+            if (!exist) {
+                res.status(400).json({ error: 'Фотография не найдена' });
+            }
+
+            res.status(200).json({ photo: exist });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при удалении фотографии' });
+        }
+    }
+
 }
 
 module.exports = new MediaController();

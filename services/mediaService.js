@@ -2,11 +2,11 @@ const fs = require('fs');
 const {PutObjectCommand, DeleteObjectCommand} = require('@aws-sdk/client-s3');
 const {v4: uuidv4} = require('uuid');
 const s3Client = require('../utils/s3Client');
+const mongoose = require("mongoose");
 const normalizeFileName = require('../utils/normalizeFile');
 
 const Photo = require('../models/photoModel');
 const Media = require('../models/mediaModel');
-const mongoose = require("mongoose");
 
 class MediaService {
     async uploadToS3(file, uuid) {
@@ -100,13 +100,13 @@ class MediaService {
                     },
                 },
                 {
+                    $sort: {'media.createdAt': -1}
+                },
+                {
                     $skip: (page - 1) * limit,
                 },
                 {
                     $limit: limit + 1,
-                },
-                {
-                    $sort: {'media.createdAt': -1}
                 }
             ]);
 
@@ -151,6 +151,15 @@ class MediaService {
             return await Photo.findById(photoId).lean().select('-__v');
         } catch (err) {
             console.error(`Ошибка при получении фото с ID ${photoId}:`, err);
+            throw err;
+        }
+    }
+
+    async isPhotoExists(photoId, uid) {
+        try {
+            return await Photo.findById(photoId).lean().select('-__v');
+        } catch (err) {
+            console.error(`Ошибка при получении фото `);
             throw err;
         }
     }
