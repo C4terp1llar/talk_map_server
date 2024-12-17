@@ -14,7 +14,7 @@ const PhotoSchema = new mongoose.Schema({
     url: {
         type: String,
         required: true,
-    }
+    },
 });
 
 const Photo = mongoose.model('Photo', PhotoSchema);

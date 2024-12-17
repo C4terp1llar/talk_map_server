@@ -1,5 +1,7 @@
 const formidable = require('formidable');
 const MediaService = require('../services/mediaService');
+const UserService = require('../services/userService');
+const wsServer = require('../utils/wsServer')
 
 class MediaController {
     async createPhoto(req, res) {
@@ -45,6 +47,15 @@ class MediaController {
                 medias.map((media) => MediaService.createPhoto(requester, media._id, media.store_url))
             );
 
+            if([...createdPhotos].length === 1){
+                let {foundFriends} = await UserService.getFriends(requester)
+                wsServer.emitToUser(foundFriends.map(i => i.toString()), 'publish_photo', {uid: requester, phId: createdPhotos[0]._id})
+            }else if ([...createdPhotos].length > 1){
+                let {foundFriends} = await UserService.getFriends(requester)
+                wsServer.emitToUser(foundFriends.map(i => i.toString()), 'publish_many_photo', {uid: requester})
+            }
+
+
             return res.status(201).json({ photos: createdPhotos });
         } catch (err) {
             console.error(err.message);
@@ -89,23 +100,40 @@ class MediaController {
         }
     }
 
-    async isPhotoExists(req, res) {
-        const { photoId, userId } = req.query;
+    async getPhoto(req, res) {
+        const { id } = req.params;
 
-        if (!photoId || !userId) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+        if (!id) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
 
         try {
-            const exist = await MediaService.isPhotoExists(photoId, userId);
+            const uid = req.user.uid
+            const ph = await MediaService.getPhotoById(id, uid);
 
-            if (!exist) {
-                res.status(400).json({ error: 'Фотография не найдена' });
-            }
-
-            res.status(200).json({ photo: exist })
+             res.status(200).json({ photo: ph })
 
         } catch (err) {
             console.error(err);
             return res.status(500).json({ error: 'Ошибка при получении фотографии' });
+        }
+    }
+
+    async reactionAction(req, res) {
+        const { entityType, entityId, userId } = req.body;
+
+        if (!entityType || !entityId || !userId) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const wasLike = await MediaService.reactAction(entityType, entityId, userId);
+
+            if (entityType === 'Photo'){
+                const {user_id} = await MediaService.getPhotoById(entityId, userId);
+                wsServer.emitToUser(user_id, 'react_photo', {uid: userId, phId: entityId, wasLike})
+            }
+
+            res.status(200).json({ status: 'ok' });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при действии с реакцией' });
         }
     }
 

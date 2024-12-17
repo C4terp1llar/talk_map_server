@@ -8,7 +8,7 @@ const normalizeFileName = require('../utils/normalizeFile');
 const Photo = require('../models/photoModel');
 const Media = require('../models/mediaModel');
 const User = require('../models/userModel');
-const {populate} = require("dotenv");
+const Reaction = require('../models/reactionModel')
 
 class MediaService {
     async uploadToS3(file, uuid) {
@@ -95,9 +95,6 @@ class MediaService {
                         user_id: 1,
                         media_id: 1,
                         url: 1,
-                        'media.client_filename': 1,
-                        'media.client_file_type': 1,
-                        'media.client_file_size': 1,
                         'media.createdAt': 1,
                     },
                 },
@@ -131,10 +128,9 @@ class MediaService {
             const photo = await Photo.findById(photoId);
             const media = await Media.findById(photo.media_id);
 
-            const objectKey = media.store_filename;
             await s3Client.send(new DeleteObjectCommand({
                 Bucket: 'talkmap-multimedia-storage',
-                Key: objectKey,
+                Key: `${media.user_id}/${media.store_filename}`,
             }));
 
             await Promise.all([
@@ -148,44 +144,43 @@ class MediaService {
         }
     }
 
-    async getPhotoById(photoId) {
-        try {
-            return await Photo.findById(photoId).lean().select('-__v');
-        } catch (err) {
-            console.error(`Ошибка при получении фото с ID ${photoId}:`, err);
-            throw err;
-        }
-    }
+    async getPhotoById(photoId, uid) {
+        if (!mongoose.Types.ObjectId.isValid(uid) || !mongoose.Types.ObjectId.isValid(photoId)) return null;
 
-    async isPhotoExists(photoId, uid) {
         try {
             const photo = await Photo.aggregate([
-                {$match: {_id: new mongoose.Types.ObjectId(photoId)}},
+                {
+                    $match: { _id: new mongoose.Types.ObjectId(photoId) }
+                },
                 {
                     $lookup: {
                         from: 'media',
                         localField: 'media_id',
                         foreignField: '_id',
-                        as: 'media_info'
+                        as: 'media_info',
                     }
                 },
-                {$unwind: {path: '$media_info', preserveNullAndEmptyArrays: true}},
+                {
+                    $unwind: { path: '$media_info', preserveNullAndEmptyArrays: true }
+                },
                 {
                     $lookup: {
-                        from: 'user',
+                        from: 'users',
                         localField: 'user_id',
                         foreignField: '_id',
-                        as: 'user_info'
+                        as: 'user_info',
                     }
                 },
-                {$unwind: {path: '$user_info', preserveNullAndEmptyArrays: true}},
+                {
+                    $unwind: { path: '$user_info', preserveNullAndEmptyArrays: true }
+                },
                 {
                     $addFields: {
                         mode: {
                             $cond: {
-                                if: {$eq: ['$user_id', new mongoose.Types.ObjectId(uid)]},
-                                then: 'internal',
-                                else: 'external'
+                                if: { $eq: ["$user_id", new mongoose.Types.ObjectId(uid)] },
+                                then: "internal",
+                                else: "external"
                             }
                         }
                     }
@@ -193,23 +188,52 @@ class MediaService {
                 {
                     $project: {
                         _id: 1,
-                        mode: 1,
                         url: 1,
                         user_id: 1,
-                        media_id: '$media_info._id',
-                        createdAt: '$media_info.createdAt',
-                        nickname: '$user_info.nickname',
-                        nickname_color: '$user_info.nickname_color',
+                        media_id: "$media_info._id",
+                        createdAt: "$media_info.createdAt",
+                        nickname: "$user_info.nickname",
+                        nickname_color: "$user_info.nickname_color",
+                        mode: 1
                     }
                 }
             ]);
 
-            return photo[0] || null;
+            if (!photo[0]) return null;
+
+            const [likesCount, userReaction] = await Promise.all([
+                Reaction.countDocuments({ entityType: "Photo", entityId: photoId }),
+                Reaction.findOne({ entityType: "Photo", entityId: photoId, userId: uid }).lean()
+            ]);
+
+            return {
+                ...photo[0],
+                likesCount,
+                liked: !!userReaction
+            };
         } catch (err) {
             console.error(`Ошибка при получении фото с ID ${photoId}:`, err);
             throw err;
         }
     }
+
+    async reactAction (entityType, entityId, userId){
+        try{
+            const exist = await Reaction.exists({ entityType, entityId, userId });
+
+            if (exist) {
+                await Reaction.deleteOne({ entityType, entityId, userId });
+            } else {
+                await Reaction.create({ entityType, entityId, userId });
+            }
+
+            return !!exist
+        }catch (err) {
+            console.error('Ошибка при действии с реакцией');
+            throw err;
+        }
+    }
+
 }
 
 module.exports = new MediaService();

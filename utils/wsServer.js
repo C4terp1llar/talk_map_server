@@ -26,13 +26,19 @@ class WsServer {
         });
     }
 
-    emitToUser(userId, eventName, data) {
-        const sockets = this.connectedSockets[userId] || [];
-        sockets.forEach(socketId => {
-            const socket = this.wsNamespace.sockets.get(socketId);
-            if (socket) {
-                socket.emit(eventName, data);
-            }
+    emitToUser(userIds, eventName, data) {
+        if (!Array.isArray(userIds)) {
+            userIds = [userIds];
+        }
+
+        userIds.forEach(userId => {
+            const sockets = this.connectedSockets[userId] || [];
+            sockets.forEach(socketId => {
+                const socket = this.wsNamespace.sockets.get(socketId);
+                if (socket) {
+                    socket.emit(eventName, data);
+                }
+            });
         });
     }
 }
