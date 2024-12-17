@@ -221,8 +221,9 @@ class UserController {
         if (!uid) return res.status(400).json({error: 'Нехватает данных или данные некорректны'});
 
         try{
+            const reqUid = req.user.uid
             const isExist = await userService.isUserExists(uid);
-            res.status(200).json({isExist});
+            res.status(200).json({isExist, match: reqUid === uid});
         }catch(err){
             console.error(err);
             return res.status(500).json({error: 'Ошибка получении информации о стороннем пользователе'});

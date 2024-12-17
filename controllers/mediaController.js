@@ -101,10 +101,11 @@ class MediaController {
                 res.status(400).json({ error: 'Фотография не найдена' });
             }
 
-            res.status(200).json({ photo: exist });
+            res.status(200).json({ photo: exist })
+
         } catch (err) {
             console.error(err);
-            return res.status(500).json({ error: 'Ошибка при удалении фотографии' });
+            return res.status(500).json({ error: 'Ошибка при получении фотографии' });
         }
     }
 

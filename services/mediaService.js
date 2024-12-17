@@ -7,6 +7,8 @@ const normalizeFileName = require('../utils/normalizeFile');
 
 const Photo = require('../models/photoModel');
 const Media = require('../models/mediaModel');
+const User = require('../models/userModel');
+const {populate} = require("dotenv");
 
 class MediaService {
     async uploadToS3(file, uuid) {
@@ -157,9 +159,54 @@ class MediaService {
 
     async isPhotoExists(photoId, uid) {
         try {
-            return await Photo.findById(photoId).lean().select('-__v');
+            const photo = await Photo.aggregate([
+                {$match: {_id: new mongoose.Types.ObjectId(photoId)}},
+                {
+                    $lookup: {
+                        from: 'media',
+                        localField: 'media_id',
+                        foreignField: '_id',
+                        as: 'media_info'
+                    }
+                },
+                {$unwind: {path: '$media_info', preserveNullAndEmptyArrays: true}},
+                {
+                    $lookup: {
+                        from: 'user',
+                        localField: 'user_id',
+                        foreignField: '_id',
+                        as: 'user_info'
+                    }
+                },
+                {$unwind: {path: '$user_info', preserveNullAndEmptyArrays: true}},
+                {
+                    $addFields: {
+                        mode: {
+                            $cond: {
+                                if: {$eq: ['$user_id', new mongoose.Types.ObjectId(uid)]},
+                                then: 'internal',
+                                else: 'external'
+                            }
+                        }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        mode: 1,
+                        url: 1,
+                        user_id: 1,
+                        media_id: '$media_info._id',
+                        createdAt: '$media_info.createdAt',
+                        nickname: '$user_info.nickname',
+                        nickname_color: '$user_info.nickname_color',
+                    }
+                }
+            ]);
+
+            return photo[0] || null;
         } catch (err) {
-            console.error(`Ошибка при получении фото `);
+            console.error(`Ошибка при получении фото с ID ${photoId}:`, err);
             throw err;
         }
     }
