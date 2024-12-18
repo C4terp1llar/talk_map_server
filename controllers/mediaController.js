@@ -43,8 +43,12 @@ class MediaController {
                 )
             );
 
+            // задержка 1мс перед сохранением чтобы сортировка по дате норм была
             const createdPhotos = await Promise.all(
-                medias.map((media) => MediaService.createPhoto(requester, media._id, media.store_url))
+                medias.map(
+                    (media) =>
+                        new Promise((resolve) => setTimeout(() => resolve(MediaService.createPhoto(requester, media._id, media.store_url)), 1))
+                )
             );
 
             if([...createdPhotos].length === 1){
@@ -114,6 +118,20 @@ class MediaController {
         } catch (err) {
             console.error(err);
             return res.status(500).json({ error: 'Ошибка при получении фотографии' });
+        }
+    }
+
+    async getPhotoGList(req, res) {
+        const { id } = req.query;
+
+        if (!id) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            const list = await MediaService.getPhotoGuessList(id);
+            res.status(200).json({ gList: list })
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при получении списка фотографий пользователя' });
         }
     }
 

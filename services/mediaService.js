@@ -81,25 +81,16 @@ class MediaService {
             const photos = await Photo.aggregate([
                 {$match: {user_id: new mongoose.Types.ObjectId(user_id)}},
                 {
-                    $lookup: {
-                        from: 'media',
-                        localField: 'media_id',
-                        foreignField: '_id',
-                        as: 'media',
-                    },
-                },
-                {$unwind: '$media'},
-                {
                     $project: {
                         _id: 1,
                         user_id: 1,
                         media_id: 1,
                         url: 1,
-                        'media.createdAt': 1,
+                        createdAt: 1,
                     },
                 },
                 {
-                    $sort: {'media.createdAt': -1}
+                    $sort: {createdAt: -1}
                 },
                 {
                     $skip: (page - 1) * limit,
@@ -190,8 +181,8 @@ class MediaService {
                         _id: 1,
                         url: 1,
                         user_id: 1,
+                        createdAt: 1,
                         media_id: "$media_info._id",
-                        createdAt: "$media_info.createdAt",
                         nickname: "$user_info.nickname",
                         nickname_color: "$user_info.nickname_color",
                         mode: 1
@@ -213,6 +204,27 @@ class MediaService {
             };
         } catch (err) {
             console.error(`Ошибка при получении фото с ID ${photoId}:`, err);
+            throw err;
+        }
+    }
+
+    async getPhotoGuessList(photoId){
+        try {
+            const photo = await Photo.findById(photoId);
+
+            if (!photo) {
+                return []
+            }
+
+            const photos = await Photo.aggregate([
+                { $match: { user_id: new mongoose.Types.ObjectId(photo.user_id) } },
+                { $sort: { createdAt: -1 } }
+            ]);
+
+            return photos.map(photo => photo._id);
+
+        } catch (err) {
+            console.error(`Ошибка при получении списка фотографий пользователя`);
             throw err;
         }
     }

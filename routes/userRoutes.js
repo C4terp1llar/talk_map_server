@@ -35,6 +35,8 @@ router.get('/photo',authMiddleware, mediaController.getPhotos);
 router.get('/photo/:id',authMiddleware, mediaController.getPhoto);
 router.delete('/photo',authMiddleware, mediaController.deletePhoto);
 
+router.get('/gPhoto',authMiddleware, mediaController.getPhotoGList);
+
 router.post('/reaction', authMiddleware, mediaController.reactionAction);
 
 
