@@ -30,6 +30,8 @@ router.post('/getFriendReqs',authMiddleware, userController.getFriendReqs);
 router.post('/getMutualFriends',authMiddleware, userController.getMutualFriends);
 router.post('/getOneFriend',authMiddleware, userController.getOneFriend);
 
+router.post('/post',authMiddleware, mediaController.createPost);
+
 router.post('/photo',authMiddleware, mediaController.createPhoto);
 router.get('/photo',authMiddleware, mediaController.getPhotos);
 router.get('/photo/:id',authMiddleware, mediaController.getPhoto);

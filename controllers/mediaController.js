@@ -3,7 +3,27 @@ const MediaService = require('../services/mediaService');
 const UserService = require('../services/userService');
 const wsServer = require('../utils/wsServer')
 
+async function uploadMedia(requester, files) {
+    const uploads = await Promise.all(
+        Object.values(files).flat().map((file) => MediaService.uploadToS3(file, requester))
+    );
+
+    return await Promise.all(
+        uploads.map((upload) =>
+            MediaService.createMedia(
+                requester,
+                upload.client_filename,
+                upload.client_file_type,
+                upload.client_file_size,
+                upload.store_filename,
+                upload.store_url
+            )
+        )
+    );
+}
+
 class MediaController {
+
     async createPhoto(req, res) {
         const requester = req.user.uid;
 
@@ -26,22 +46,13 @@ class MediaController {
                 return res.status(400).json({ error: 'Некорректные данные или отсутствуют файлы.' });
             }
 
-            const uploads = await Promise.all(
-                Object.values(files).flat().map((file) => MediaService.uploadToS3(file, requester))
-            );
-
-            const medias = await Promise.all(
-                uploads.map((upload) =>
-                    MediaService.createMedia(
-                        requester,
-                        upload.client_filename,
-                        upload.client_file_type,
-                        upload.client_file_size,
-                        upload.store_filename,
-                        upload.store_url
-                    )
-                )
-            );
+            let medias = [];
+            try {
+                medias = await uploadMedia(requester, files);
+            } catch (uploadError) {
+                console.error("Ошибка загрузки медиа при создании фото:", uploadError);
+                return res.status(500).json({ error: 'Ошибка загрузки медиа при создании фото' });
+            }
 
             // задержка 1мс перед сохранением чтобы сортировка по дате норм была
             const createdPhotos = await Promise.all(
@@ -58,7 +69,6 @@ class MediaController {
                 let {foundFriends} = await UserService.getFriends(requester)
                 wsServer.emitToUser(foundFriends.map(i => i.toString()), 'publish_many_photo', {uid: requester})
             }
-
 
             return res.status(201).json({ photos: createdPhotos });
         } catch (err) {
@@ -152,6 +162,56 @@ class MediaController {
         } catch (err) {
             console.error(err);
             return res.status(500).json({ error: 'Ошибка при действии с реакцией' });
+        }
+    }
+
+    async createPost(req, res) {
+        const requester = req.user.uid;
+
+        const form = new formidable.IncomingForm({
+            multiples: true,
+            uploadDir: './uploads',
+            keepExtensions: true,
+        });
+
+        try {
+            const { fields, files } = await new Promise((resolve, reject) => {
+                form.parse(req, (err, fields, files) => {
+                    if (err) return reject(err);
+                    resolve({ fields, files });
+                });
+            });
+
+            const { sender, text } = fields;
+            if (!text.length || !text[0]?.length || !sender.length || sender[0] !== 'post') {
+                return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+            }
+
+            if (!files || Object.keys(files).length === 0) {
+                const post = await MediaService.createPost(requester, text[0])
+                return res.status(201).json({ post });
+            }
+
+            let medias = [];
+            try {
+                medias = await uploadMedia(requester, files);
+            } catch (uploadError) {
+                console.error("Ошибка загрузки медиа при создании поста:", uploadError);
+                return res.status(500).json({ error: 'Ошибка при создании поста, загрузка медиа' });
+            }
+            const mediaIds = medias.map(media => media.id);
+
+            const post = await MediaService.createPost(requester, text[0], mediaIds)
+
+            let {foundFriends} = await UserService.getFriends(requester)
+            if (foundFriends && foundFriends.length > 0) {
+                wsServer.emitToUser(foundFriends.map(i => i.toString()), 'publish_post', { uid: requester, post });
+            }
+
+            return res.status(201).json({ post });
+        } catch (err) {
+            console.error(err.message);
+            return res.status(500).json({ error: 'Ошибка при создании поста' });
         }
     }
 

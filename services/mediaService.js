@@ -9,6 +9,7 @@ const Photo = require('../models/photoModel');
 const Media = require('../models/mediaModel');
 const User = require('../models/userModel');
 const Reaction = require('../models/reactionModel')
+const Post = require('../models/postModel')
 
 class MediaService {
     async uploadToS3(file, uuid) {
@@ -41,8 +42,11 @@ class MediaService {
             console.error("Ошибка при загрузке файлов на S3", err);
             throw err;
         } finally {
+            fileStream.destroy();
             try {
-                await fs.promises.unlink(file.filepath);
+                if (fs.existsSync(file.filepath)) {
+                    await fs.promises.unlink(file.filepath);
+                }
             } catch (unlinkError) {
                 console.error("Ошибка при удалении временного файла:", unlinkError);
             }
@@ -242,6 +246,16 @@ class MediaService {
             return !!exist
         }catch (err) {
             console.error('Ошибка при действии с реакцией');
+            throw err;
+        }
+    }
+
+    async createPost (user_id, text, media){
+        try{
+            return await Post.create({ user_id, text, media: media || [] });
+
+        }catch (err) {
+            console.error('Ошибка при создании поста');
             throw err;
         }
     }
