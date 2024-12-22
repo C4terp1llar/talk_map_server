@@ -215,6 +215,45 @@ class MediaController {
         }
     }
 
+    async deletePost(req, res) {
+        const { postId } = req.params;
+
+        if (!postId) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try {
+            await MediaService.deletePost(postId);
+            res.status(204).json({ status: 'ok' });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка при удалении поста' });
+        }
+    }
+
+    async getPosts(req, res) {
+        const { mode, searchUid, page = 1, limit = 10 } = req.query;
+
+        if (mode !== 'external' && mode !== 'internal') {
+            return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+        }
+
+        try {
+            const requesterUserUid = req.user.uid;
+            const postOwnerUid = mode === 'internal' ? requesterUserUid : searchUid;
+
+            if (!postOwnerUid) {
+                return res.status(400).json({ error: 'Нехватает данных о пользователе' });
+            }
+
+            const { posts, hasMore } = await MediaService.getPosts(postOwnerUid, requesterUserUid, +page, +limit);
+
+            res.status(200).json({ posts, hasMore });
+        } catch (err) {
+            console.error('Ошибка при получении постов');
+            return res.status(500).json({ error: 'Ошибка при получении постов' });
+        }
+    }
+
+
 }
 
 module.exports = new MediaController();

@@ -31,6 +31,8 @@ router.post('/getMutualFriends',authMiddleware, userController.getMutualFriends)
 router.post('/getOneFriend',authMiddleware, userController.getOneFriend);
 
 router.post('/post',authMiddleware, mediaController.createPost);
+router.get('/post',authMiddleware, mediaController.getPosts);
+router.delete('/post/:id',authMiddleware, mediaController.deletePost);
 
 router.post('/photo',authMiddleware, mediaController.createPhoto);
 router.get('/photo',authMiddleware, mediaController.getPhotos);
@@ -40,7 +42,5 @@ router.delete('/photo',authMiddleware, mediaController.deletePhoto);
 router.get('/gPhoto',authMiddleware, mediaController.getPhotoGList);
 
 router.post('/reaction', authMiddleware, mediaController.reactionAction);
-
-
 
 module.exports = router;

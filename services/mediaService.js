@@ -130,7 +130,8 @@ class MediaService {
 
             await Promise.all([
                 Photo.deleteOne({_id: photoId}),
-                Media.deleteOne({_id: media._id})
+                Media.deleteOne({_id: media._id}),
+                Reaction.deleteMany({entityType: 'Photo', entityId: photoId})
             ])
 
         } catch (err) {
@@ -259,6 +260,165 @@ class MediaService {
             throw err;
         }
     }
+
+    async getPosts(postOwnerUid, requesterUserUid, page = 1, limit = 15) {
+        try {
+            const posts = await Post.aggregate([
+                {
+                    $match: { user_id: new mongoose.Types.ObjectId(postOwnerUid) }
+                },
+                {
+                    $lookup: {
+                        from: 'media',
+                        localField: 'media',
+                        foreignField: '_id',
+                        as: 'media_info',
+                    },
+                },
+                {
+                    $addFields: {
+                        media_info: {
+                            $map: {
+                                input: '$media_info',
+                                as: 'media',
+                                in: {
+                                    id: '$$media._id',
+                                    url: '$$media.store_url',
+                                    type: '$$media.client_file_type',
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'reactions',
+                        let: { postId: '$_id' },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: { $eq: ['$entityId', '$$postId'] },
+                                    entityType: 'Post',
+                                },
+                            },
+                            {
+                                $group: {
+                                    _id: null,
+                                    count: { $sum: 1 }
+                                },
+                            },
+                        ],
+                        as: 'reactions_info',
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'reactions',
+                        let: { postId: '$_id', requesterId: new mongoose.Types.ObjectId(requesterUserUid) },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            { $eq: ['$entityId', '$$postId'] },
+                                            { $eq: ['$userId', '$$requesterId'] },
+                                            { $eq: ['$entityType', 'Post'] },
+                                        ],
+                                    },
+                                },
+                            },
+                        ],
+                        as: 'liked_info',
+                    },
+                },
+                {
+                    $addFields: {
+                        likes_count: {
+                            $ifNull: [{ $arrayElemAt: ['$reactions_info.count', 0] }, 0]
+                        },
+                        liked: {
+                            $gt: [{ $size: '$liked_info' }, 0]
+                        },
+                        mode: {
+                            $cond: {
+                                if: { $eq: [postOwnerUid, requesterUserUid] },
+                                then: 'internal',
+                                else: 'external',
+                            },
+                        },
+                    },
+                },
+                {
+                    $sort: { createdAt: -1 },
+                },
+                {
+                    $skip: (page - 1) * limit,
+                },
+                {
+                    $limit: limit + 1,
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        user_id: 1,
+                        text: 1,
+                        createdAt: 1,
+                        media: '$media_info',
+                        likes_count: 1,
+                        liked: 1,
+                        mode: 1
+                    }
+                }
+            ]);
+
+            const hasMore = posts.length > limit;
+            if (hasMore) {
+                posts.pop();
+            }
+
+            return { posts, hasMore };
+
+        } catch (err) {
+            console.error('Ошибка при получении постов:', err);
+            throw err;
+        }
+    }
+
+
+
+    async deletePost(postId, uid) {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+        try {
+            const post = await Post.findById(postId).session(session);
+            if (!post) {
+                throw new Error('Пост не найден');
+            }
+
+            if (post.user_id.toString() !== uid) {
+                throw new Error('Нет доступа для удаления этого поста');
+            }
+
+            await Promise.all([
+                post.media.length > 0
+                    ? Media.deleteMany({ _id: { $in: post.media } }).session(session)
+                    : Promise.resolve(),
+
+                Reaction.deleteMany({ entityType: 'Post', entityId: postId }).session(session),
+                Post.findByIdAndDelete(postId).session(session),
+            ]);
+
+            await session.commitTransaction();
+            await session.endSession();
+        } catch (err) {
+            await session.abortTransaction();
+            await session.endSession();
+            console.error('Ошибка при удалении поста:', err);
+            throw err;
+        }
+    }
+
 
 }
 
