@@ -11,6 +11,8 @@ const User = require('../models/userModel');
 const Reaction = require('../models/reactionModel')
 const Post = require('../models/postModel')
 
+const UserService = require('../services/userService')
+
 class MediaService {
     async uploadToS3(file, uuid) {
         const fileType = file.mimetype || 'application/octet-stream';
@@ -263,120 +265,134 @@ class MediaService {
 
     async getPosts(postOwnerUid, requesterUserUid, page = 1, limit = 15) {
         try {
-            const posts = await Post.aggregate([
-                {
-                    $match: { user_id: new mongoose.Types.ObjectId(postOwnerUid) }
-                },
-                {
-                    $lookup: {
-                        from: 'media',
-                        localField: 'media',
-                        foreignField: '_id',
-                        as: 'media_info',
+
+            const [posts, postOwnerInfo, postOwnerAvatar] = await Promise.all([
+                await Post.aggregate([
+                    {
+                        $match: { user_id: new mongoose.Types.ObjectId(postOwnerUid) }
                     },
-                },
-                {
-                    $addFields: {
-                        media_info: {
-                            $map: {
-                                input: '$media_info',
-                                as: 'media',
-                                in: {
-                                    id: '$$media._id',
-                                    url: '$$media.store_url',
-                                    type: '$$media.client_file_type',
-                                },
-                            },
+                    {
+                        $lookup: {
+                            from: 'media',
+                            localField: 'media',
+                            foreignField: '_id',
+                            as: 'media_info',
                         },
                     },
-                },
-                {
-                    $lookup: {
-                        from: 'reactions',
-                        let: { postId: '$_id' },
-                        pipeline: [
-                            {
-                                $match: {
-                                    $expr: { $eq: ['$entityId', '$$postId'] },
-                                    entityType: 'Post',
-                                },
-                            },
-                            {
-                                $group: {
-                                    _id: null,
-                                    count: { $sum: 1 }
-                                },
-                            },
-                        ],
-                        as: 'reactions_info',
-                    },
-                },
-                {
-                    $lookup: {
-                        from: 'reactions',
-                        let: { postId: '$_id', requesterId: new mongoose.Types.ObjectId(requesterUserUid) },
-                        pipeline: [
-                            {
-                                $match: {
-                                    $expr: {
-                                        $and: [
-                                            { $eq: ['$entityId', '$$postId'] },
-                                            { $eq: ['$userId', '$$requesterId'] },
-                                            { $eq: ['$entityType', 'Post'] },
-                                        ],
+                    {
+                        $addFields: {
+                            media_info: {
+                                $map: {
+                                    input: '$media_info',
+                                    as: 'media',
+                                    in: {
+                                        id: '$$media._id',
+                                        url: '$$media.store_url',
+                                        type: '$$media.client_file_type',
                                     },
                                 },
                             },
-                        ],
-                        as: 'liked_info',
+                        },
                     },
-                },
-                {
-                    $addFields: {
-                        likes_count: {
-                            $ifNull: [{ $arrayElemAt: ['$reactions_info.count', 0] }, 0]
+                    {
+                        $lookup: {
+                            from: 'reactions',
+                            let: { postId: '$_id' },
+                            pipeline: [
+                                {
+                                    $match: {
+                                        $expr: { $eq: ['$entityId', '$$postId'] },
+                                        entityType: 'Post',
+                                    },
+                                },
+                                {
+                                    $group: {
+                                        _id: null,
+                                        count: { $sum: 1 }
+                                    },
+                                },
+                            ],
+                            as: 'reactions_info',
                         },
-                        liked: {
-                            $gt: [{ $size: '$liked_info' }, 0]
+                    },
+                    {
+                        $lookup: {
+                            from: 'reactions',
+                            let: { postId: '$_id', requesterId: new mongoose.Types.ObjectId(requesterUserUid) },
+                            pipeline: [
+                                {
+                                    $match: {
+                                        $expr: {
+                                            $and: [
+                                                { $eq: ['$entityId', '$$postId'] },
+                                                { $eq: ['$userId', '$$requesterId'] },
+                                                { $eq: ['$entityType', 'Post'] },
+                                            ],
+                                        },
+                                    },
+                                },
+                            ],
+                            as: 'liked_info',
                         },
-                        mode: {
-                            $cond: {
-                                if: { $eq: [postOwnerUid, requesterUserUid] },
-                                then: 'internal',
-                                else: 'external',
+                    },
+                    {
+                        $addFields: {
+                            likes_count: {
+                                $ifNull: [{ $arrayElemAt: ['$reactions_info.count', 0] }, 0]
+                            },
+                            liked: {
+                                $gt: [{ $size: '$liked_info' }, 0]
+                            },
+                            mode: {
+                                $cond: {
+                                    if: { $eq: [postOwnerUid, requesterUserUid] },
+                                    then: 'internal',
+                                    else: 'external',
+                                },
                             },
                         },
                     },
-                },
-                {
-                    $sort: { createdAt: -1 },
-                },
-                {
-                    $skip: (page - 1) * limit,
-                },
-                {
-                    $limit: limit + 1,
-                },
-                {
-                    $project: {
-                        _id: 1,
-                        user_id: 1,
-                        text: 1,
-                        createdAt: 1,
-                        media: '$media_info',
-                        likes_count: 1,
-                        liked: 1,
-                        mode: 1
+                    {
+                        $sort: { createdAt: -1 },
+                    },
+                    {
+                        $skip: (page - 1) * limit,
+                    },
+                    {
+                        $limit: limit + 1,
+                    },
+                    {
+                        $project: {
+                            _id: 1,
+                            user_id: 1,
+                            text: 1,
+                            createdAt: 1,
+                            media: '$media_info',
+                            likes_count: 1,
+                            liked: 1,
+                            mode: 1
+                        }
                     }
-                }
-            ]);
+                ]),
+                await User.findById(postOwnerUid).select('_id nickname nickname_color').lean(),
+                await UserService.getUserAvatar(postOwnerUid)
+            ])
+
+
+            const ownerInfo = {
+                _id: postOwnerInfo._id,
+                nickname: postOwnerInfo.nickname,
+                nickname_color: postOwnerInfo.nickname_color,
+                avatar: postOwnerAvatar.asset_url,
+                match: postOwnerUid === requesterUserUid
+            }
 
             const hasMore = posts.length > limit;
             if (hasMore) {
                 posts.pop();
             }
 
-            return { posts, hasMore };
+            return { posts, hasMore, ownerInfo };
 
         } catch (err) {
             console.error('Ошибка при получении постов:', err);
@@ -400,13 +416,23 @@ class MediaService {
                 throw new Error('Нет доступа для удаления этого поста');
             }
 
-            await Promise.all([
-                post.media.length > 0
-                    ? Media.deleteMany({ _id: { $in: post.media } }).session(session)
-                    : Promise.resolve(),
+            const mediaList = await Media.find({ _id: { $in: post.media } }).session(session);
 
+            if (mediaList.length > 0) {
+                await Promise.all(
+                    mediaList.map(media =>
+                        s3Client.send(new DeleteObjectCommand({
+                            Bucket: 'talkmap-multimedia-storage',
+                            Key: `${media.user_id}/${media.store_filename}`,
+                        }))
+                    )
+                );
+            }
+
+            await Promise.all([
+                Media.deleteMany({ _id: { $in: post.media } }).session(session),
                 Reaction.deleteMany({ entityType: 'Post', entityId: postId }).session(session),
-                Post.findByIdAndDelete(postId).session(session),
+                Post.findByIdAndDelete(postId).session(session)
             ]);
 
             await session.commitTransaction();
@@ -418,6 +444,7 @@ class MediaService {
             throw err;
         }
     }
+
 
 
 }

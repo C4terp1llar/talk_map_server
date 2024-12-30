@@ -216,12 +216,13 @@ class MediaController {
     }
 
     async deletePost(req, res) {
-        const { postId } = req.params;
+        const { id } = req.params;
 
-        if (!postId) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+        if (!id) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
 
         try {
-            await MediaService.deletePost(postId);
+            const requester = req.user.uid;
+            await MediaService.deletePost(id, requester);
             res.status(204).json({ status: 'ok' });
         } catch (err) {
             console.error(err);
@@ -244,9 +245,9 @@ class MediaController {
                 return res.status(400).json({ error: 'Нехватает данных о пользователе' });
             }
 
-            const { posts, hasMore } = await MediaService.getPosts(postOwnerUid, requesterUserUid, +page, +limit);
+            const { posts, hasMore, ownerInfo } = await MediaService.getPosts(postOwnerUid, requesterUserUid, +page, +limit);
 
-            res.status(200).json({ posts, hasMore });
+            res.status(200).json({ posts, hasMore, ownerInfo });
         } catch (err) {
             console.error('Ошибка при получении постов');
             return res.status(500).json({ error: 'Ошибка при получении постов' });
