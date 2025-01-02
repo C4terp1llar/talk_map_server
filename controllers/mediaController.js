@@ -254,6 +254,39 @@ class MediaController {
         }
     }
 
+    async getComments(req, res) {
+        const { entityType, entityId, page, limit, parentCommentId} = req.query;
+
+        if (!entityType || !entityId || !page || !limit) {
+            return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+        }
+
+        try {
+            const requesterUserUid = req.user.uid;
+            const { comments, hasMore } = await MediaService.getComments(requesterUserUid, entityType, entityId, +page, +limit, parentCommentId);
+            res.status(200).json({ comments, hasMore });
+        } catch (err) {
+            console.error('Ошибка при получении комментариев');
+            return res.status(500).json({ error: 'Ошибка при получении комментариев' });
+        }
+    }
+
+    async createComment(req, res) {
+        const { entityType, entityId, text, parentCommentId} = req.body;
+
+        if (!entityType || !entityId || !text || text.trim().length === 0) {
+            return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+        }
+
+        try {
+            const requesterUserUid = req.user.uid;
+            await MediaService.createComment(entityType, entityId, requesterUserUid, text, parentCommentId)
+            res.status(201).json({ message: 'ok' });
+        } catch (err) {
+            console.error('Ошибка при создании комментария');
+            return res.status(500).json({ error: 'Ошибка при создании комментария' });
+        }
+    }
 
 }
 

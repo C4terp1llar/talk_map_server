@@ -34,6 +34,9 @@ router.post('/post',authMiddleware, mediaController.createPost);
 router.get('/post',authMiddleware, mediaController.getPosts);
 router.delete('/post/:id',authMiddleware, mediaController.deletePost);
 
+router.post('/comment',authMiddleware, mediaController.createComment);
+router.get('/comment',authMiddleware, mediaController.getComments);
+
 router.post('/photo',authMiddleware, mediaController.createPhoto);
 router.get('/photo',authMiddleware, mediaController.getPhotos);
 router.get('/photo/:id',authMiddleware, mediaController.getPhoto);

@@ -8,8 +8,9 @@ const normalizeFileName = require('../utils/normalizeFile');
 const Photo = require('../models/photoModel');
 const Media = require('../models/mediaModel');
 const User = require('../models/userModel');
-const Reaction = require('../models/reactionModel')
-const Post = require('../models/postModel')
+const Reaction = require('../models/reactionModel');
+const Post = require('../models/postModel');
+const Comment = require('../models/commentModel');
 
 const UserService = require('../services/userService')
 
@@ -445,7 +446,170 @@ class MediaService {
         }
     }
 
+    //requesterUserUid, entityType, entityId, +page, +limit, parentCommentId
+    async getComments(requester, entityType, entityId, page = 1, limit = 15, parentCommentId = null) {
+        try{
 
+            const matchStage = {
+                entityType,
+                entityId,
+                parentCommentId: parentCommentId ? parentCommentId : null,
+            };
+
+            const pipeline = [
+                { $match: matchStage },
+                { $sort: { createdAt: -1 } },
+                { $skip: (page - 1) * limit },
+                { $limit: limit + 1 },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'user_id',
+                        foreignField: '_id',
+                        as: 'userInfo',
+                    },
+                },
+                {
+                    $addFields: {
+                        userInfo: { $arrayElemAt: ['$userInfo', 0] },
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'avatars',
+                        localField: 'userInfo._id',
+                        foreignField: 'user_id',
+                        as: 'avatarInfo',
+                    },
+                },
+                {
+                    $addFields: {
+                        avatarInfo: { $arrayElemAt: ['$avatarInfo', 0] },
+                    },
+                },
+                {
+                    $addFields: {
+                        mode: {
+                            $cond: {
+                                if: { $eq: ['$user_id', requester] },
+                                then: 'internal',
+                                else: 'external',
+                            },
+                        },
+                        user: {
+                            _id: '$userInfo._id',
+                            nickname: '$userInfo.nickname',
+                            nickname_color: '$userInfo.nickname_color',
+                            avatar: '$avatarInfo.asset_url',
+                        },
+                    },
+                },
+                {
+                    $project: {
+                        userInfo: 0,
+                        avatarInfo: 0,
+                    },
+                },
+            ];
+
+            if (!parentCommentId) {
+                pipeline.push({
+                    $lookup: {
+                        from: 'comments',
+                        localField: '_id',
+                        foreignField: 'parentCommentId',
+                        as: 'replies',
+                    },
+                });
+
+                pipeline.push({
+                    $addFields: {
+                        repliesCount: { $size: '$replies' },
+                    },
+                });
+
+                pipeline.push({
+                    $project: {
+                        replies: 0,
+                    },
+                });
+            }
+
+            const comments = await Comment.aggregate(pipeline);
+
+            const hasMore = comments.length > limit;
+            if (hasMore) {
+                comments.pop();
+            }
+
+            return {
+                comments,
+                hasMore,
+            };
+        }catch (err){
+            console.error('Ошибка при получении комментариев:', err);
+            throw err;
+        }
+    }
+
+    //entityType, entityId, requesterUserUid, text, parentCommentId
+    async createComment(entityType, entityId, userId, text, parentCommentId = null){
+        try {
+            const user = await User.findById(userId);
+
+            if (!user) {
+                throw new Error('Пользователь не найден');
+            }
+
+            let entityModel;
+
+            switch (entityType) {
+                case 'Post':
+                    entityModel = Post;
+                    break;
+                case 'Comment':
+                    entityModel = Comment;
+                    break;
+                // case 'Publication':
+                //     entityModel = Publication;
+                //     break;
+                default:
+                    throw new Error('Неподдерживаемый тип сущности');
+            }
+
+            const parentEntity = await entityModel.findById(entityId);
+
+            if (!parentEntity) {
+                throw new Error('Родительская сущность не найдена');
+            }
+
+            if (parentCommentId) {
+                const parentComment = await Comment.findById(parentCommentId);
+
+                if (!parentComment) {
+                    throw new Error('Родительский комментарий не найден');
+                }
+
+                if (parentComment.entityType !== entityType || parentComment.entityId.toString() !== entityId.toString()) {
+                    throw new Error('Родительский комментарий не относится к данной сущности');
+                }
+            }
+
+            const newComment = new Comment({
+                entityType,
+                entityId,
+                parentCommentId,
+                user_id: userId,
+                text,
+            });
+
+            await newComment.save();
+
+        } catch (err) {
+            console.error('Ошибка при создании комментария:', err);
+            throw err;
+        }
+    }
 
 }
 
