@@ -264,7 +264,7 @@ class MediaController {
         try {
             const requesterUserUid = req.user.uid;
             const { comments, hasMore } = await MediaService.getComments(requesterUserUid, entityType, entityId, +page, +limit, parentCommentId);
-            res.status(200).json({ comments, hasMore });
+            return res.status(200).json({ comments, hasMore });
         } catch (err) {
             console.error('Ошибка при получении комментариев');
             return res.status(500).json({ error: 'Ошибка при получении комментариев' });

@@ -451,16 +451,13 @@ class MediaService {
         try{
 
             const matchStage = {
-                entityType,
-                entityId,
-                parentCommentId: parentCommentId ? parentCommentId : null,
+                entityType: entityType,
+                entityId: new mongoose.Types.ObjectId(entityId),
+                parentCommentId: parentCommentId ? new mongoose.Types.ObjectId(parentCommentId) : null,
             };
 
             const pipeline = [
                 { $match: matchStage },
-                { $sort: { createdAt: -1 } },
-                { $skip: (page - 1) * limit },
-                { $limit: limit + 1 },
                 {
                     $lookup: {
                         from: 'users',
@@ -504,12 +501,21 @@ class MediaService {
                         },
                     },
                 },
+                { $sort: { createdAt: 1 } },
                 {
                     $project: {
-                        userInfo: 0,
-                        avatarInfo: 0,
-                    },
+                        entityId: 1,
+                        entityType: 1,
+                        parentCommentId: 1,
+                        text: 1,
+                        isEdited: 1,
+                        createdAt: 1,
+                        mode: 1,
+                        user: 1
+                    }
                 },
+                { $skip: (page - 1) * limit },
+                { $limit: limit + 1 },
             ];
 
             if (!parentCommentId) {
@@ -535,7 +541,7 @@ class MediaService {
                 });
             }
 
-            const comments = await Comment.aggregate(pipeline);
+            const comments = await Comment.aggregate([...pipeline]);
 
             const hasMore = comments.length > limit;
             if (hasMore) {
