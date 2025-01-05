@@ -264,13 +264,25 @@ class MediaService {
         }
     }
 
-    async getPosts(postOwnerUid, requesterUserUid, page = 1, limit = 15) {
+    async getPosts(postOwnerUid, requesterUserUid, page = 1, limit = 15, postId) {
         try {
+            let currentOwner = postOwnerUid
+            let matchCase = { user_id: new mongoose.Types.ObjectId(postOwnerUid) }
+
+            if (postId) {
+                if (!mongoose.Types.ObjectId.isValid(postId)) return {posts: [], ownerInfo: null};
+                const post = await Post.findById(postId).lean();
+                if (!post) return {posts: [], ownerInfo: null};
+
+                currentOwner = post.user_id.toString();
+                matchCase = { _id: new mongoose.Types.ObjectId(postId) };
+            }
+
 
             const [posts, postOwnerInfo, postOwnerAvatar] = await Promise.all([
                 await Post.aggregate([
                     {
-                        $match: { user_id: new mongoose.Types.ObjectId(postOwnerUid) }
+                        $match: matchCase
                     },
                     {
                         $lookup: {
@@ -337,6 +349,28 @@ class MediaService {
                         },
                     },
                     {
+                        $lookup: {
+                            from: 'comments',
+                            let: { postId: '$_id' },
+                            pipeline: [
+                                {
+                                    $match: {
+                                        $expr: {
+                                            $and: [
+                                                { $eq: ['$entityId', '$$postId'] },
+                                                { $eq: ['$entityType', 'Post'] },
+                                            ],
+                                        },
+                                    },
+                                },
+                                {
+                                    $count: 'count',
+                                },
+                            ],
+                            as: 'comments_info',
+                        },
+                    },
+                    {
                         $addFields: {
                             likes_count: {
                                 $ifNull: [{ $arrayElemAt: ['$reactions_info.count', 0] }, 0]
@@ -344,9 +378,12 @@ class MediaService {
                             liked: {
                                 $gt: [{ $size: '$liked_info' }, 0]
                             },
+                            comments_count: {
+                                $ifNull: [{ $arrayElemAt: ['$comments_info.count', 0] }, 0],
+                            },
                             mode: {
                                 $cond: {
-                                    if: { $eq: [postOwnerUid, requesterUserUid] },
+                                    if: { $eq: [currentOwner, requesterUserUid] },
                                     then: 'internal',
                                     else: 'external',
                                 },
@@ -370,13 +407,14 @@ class MediaService {
                             createdAt: 1,
                             media: '$media_info',
                             likes_count: 1,
+                            comments_count: 1,
                             liked: 1,
                             mode: 1
                         }
                     }
                 ]),
-                await User.findById(postOwnerUid).select('_id nickname nickname_color').lean(),
-                await UserService.getUserAvatar(postOwnerUid)
+                await User.findById(currentOwner).select('_id nickname nickname_color').lean(),
+                await UserService.getUserAvatar(currentOwner)
             ])
 
 
@@ -385,7 +423,7 @@ class MediaService {
                 nickname: postOwnerInfo.nickname,
                 nickname_color: postOwnerInfo.nickname_color,
                 avatar: postOwnerAvatar.asset_url,
-                match: postOwnerUid === requesterUserUid
+                match: currentOwner === requesterUserUid
             }
 
             const hasMore = posts.length > limit;
@@ -400,8 +438,6 @@ class MediaService {
             throw err;
         }
     }
-
-
 
     async deletePost(postId, uid) {
         const session = await mongoose.startSession();
@@ -558,7 +594,6 @@ class MediaService {
         }
     }
 
-    //entityType, entityId, requesterUserUid, text, parentCommentId
     async createComment(entityType, entityId, userId, text, parentCommentId = null){
         try {
             const user = await User.findById(userId);
@@ -617,6 +652,29 @@ class MediaService {
         }
     }
 
+    async getMediaOwnerWsInfo(entityType, entityId){
+        try{
+            let entityModel;
+            switch (entityType) {
+                case 'Post':
+                    entityModel = Post;
+                    break;
+                case 'Photo':
+                    entityModel = Photo;
+                    break;
+                case 'Comment':
+                    entityModel = Comment;
+                    break;
+                default:
+                    throw new Error('Неподдерживаемый тип сущности');
+            }
+
+            return await entityModel.findById(entityId);
+        }catch(err){
+            console.error('Ошибка при поиске инфы о юзере при ws уведомлении:', err);
+            throw err;
+        }
+    }
 }
 
 module.exports = new MediaService();

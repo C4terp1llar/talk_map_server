@@ -64,10 +64,10 @@ class MediaController {
 
             if([...createdPhotos].length === 1){
                 let {foundFriends} = await UserService.getFriends(requester)
-                wsServer.emitToUser(foundFriends.map(i => i.toString()), 'publish_photo', {uid: requester, phId: createdPhotos[0]._id})
+                wsServer.emitToUser(foundFriends.map(i => i.toString()), 'publish_Photo', {uid: requester, phId: createdPhotos[0]._id})
             }else if ([...createdPhotos].length > 1){
                 let {foundFriends} = await UserService.getFriends(requester)
-                wsServer.emitToUser(foundFriends.map(i => i.toString()), 'publish_many_photo', {uid: requester})
+                wsServer.emitToUser(foundFriends.map(i => i.toString()), 'publish_many_Photo', {uid: requester})
             }
 
             return res.status(201).json({ photos: createdPhotos });
@@ -151,11 +151,13 @@ class MediaController {
         if (!entityType || !entityId || !userId) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
 
         try {
-            const wasLike = await MediaService.reactAction(entityType, entityId, userId);
+            const sender = req.user.uid;
 
-            if (entityType === 'Photo'){
-                const {user_id} = await MediaService.getPhotoById(entityId, userId);
-                wsServer.emitToUser(user_id, 'react_photo', {uid: userId, phId: entityId, wasLike})
+            const wasLike = await MediaService.reactAction(entityType, entityId, sender);
+
+            if (entityType){
+                const {user_id} = await MediaService.getMediaOwnerWsInfo(entityType, entityId)
+                wsServer.emitToUser(user_id, `react_media`, {entity: entityType, reactor: sender, entity_id: entityId, wasLike})
             }
 
             res.status(200).json({ status: 'ok' });
@@ -251,6 +253,23 @@ class MediaController {
         } catch (err) {
             console.error('Ошибка при получении постов');
             return res.status(500).json({ error: 'Ошибка при получении постов' });
+        }
+    }
+
+    async getPost(req, res) {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+        }
+
+        try {
+            const requesterUserUid = req.user.uid;
+            const {posts, ownerInfo} = await MediaService.getPosts(undefined, requesterUserUid, 1, 1, id);
+            res.status(200).json({ posts, ownerInfo });
+        } catch (err) {
+            console.error('Ошибка при получении поста');
+            return res.status(500).json({ error: 'Ошибка при получении поста' });
         }
     }
 

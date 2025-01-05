@@ -32,6 +32,7 @@ router.post('/getOneFriend',authMiddleware, userController.getOneFriend);
 
 router.post('/post',authMiddleware, mediaController.createPost);
 router.get('/post',authMiddleware, mediaController.getPosts);
+router.get('/post/:id',authMiddleware, mediaController.getPost);
 router.delete('/post/:id',authMiddleware, mediaController.deletePost);
 
 router.post('/comment',authMiddleware, mediaController.createComment);
