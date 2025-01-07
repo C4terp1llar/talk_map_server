@@ -22,6 +22,13 @@ async function uploadMedia(requester, files) {
     );
 }
 
+async function emitPublishPost (requester, post){
+    let {foundFriends} = await UserService.getFriends(requester)
+    if (foundFriends && foundFriends.length > 0) {
+        wsServer.emitToUser(foundFriends.map(i => i.toString()), 'publish_Post', {uid: requester, post});
+    }
+}
+
 class MediaController {
 
     async createPhoto(req, res) {
@@ -191,6 +198,7 @@ class MediaController {
 
             if (!files || Object.keys(files).length === 0) {
                 const post = await MediaService.createPost(requester, text[0])
+                await emitPublishPost(requester, post)
                 return res.status(201).json({ post });
             }
 
@@ -205,10 +213,7 @@ class MediaController {
 
             const post = await MediaService.createPost(requester, text[0], mediaIds)
 
-            let {foundFriends} = await UserService.getFriends(requester)
-            if (foundFriends && foundFriends.length > 0) {
-                wsServer.emitToUser(foundFriends.map(i => i.toString()), 'publish_post', { uid: requester, post });
-            }
+            await emitPublishPost(requester, post)
 
             return res.status(201).json({ post });
         } catch (err) {

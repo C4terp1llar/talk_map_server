@@ -594,6 +594,98 @@ class MediaService {
         }
     }
 
+    async getCommentById(requester, commentId) {
+        try {
+            const pipeline = [
+                {
+                    $match: {
+                        _id: new mongoose.Types.ObjectId(commentId),
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'user_id',
+                        foreignField: '_id',
+                        as: 'userInfo',
+                    },
+                },
+                {
+                    $addFields: {
+                        userInfo: { $arrayElemAt: ['$userInfo', 0] },
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'avatars',
+                        localField: 'userInfo._id',
+                        foreignField: 'user_id',
+                        as: 'avatarInfo',
+                    },
+                },
+                {
+                    $addFields: {
+                        avatarInfo: { $arrayElemAt: ['$avatarInfo', 0] },
+                    },
+                },
+                {
+                    $addFields: {
+                        mode: {
+                            $cond: {
+                                if: { $eq: ['$user_id', requester] },
+                                then: 'internal',
+                                else: 'external',
+                            },
+                        },
+                        user: {
+                            _id: '$userInfo._id',
+                            nickname: '$userInfo.nickname',
+                            nickname_color: '$userInfo.nickname_color',
+                            avatar: '$avatarInfo.asset_url',
+                        },
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'comments',
+                        localField: '_id',
+                        foreignField: 'parentCommentId',
+                        as: 'replies',
+                    },
+                },
+                {
+                    $addFields: {
+                        repliesCount: { $size: '$replies' },
+                    },
+                },
+                {
+                    $project: {
+                        entityId: 1,
+                        entityType: 1,
+                        parentCommentId: 1,
+                        text: 1,
+                        isEdited: 1,
+                        createdAt: 1,
+                        mode: 1,
+                        user: 1,
+                        repliesCount: 1,
+                    },
+                },
+            ];
+
+            const comment = await Comment.aggregate(pipeline);
+
+            if (!comment || comment.length === 0) {
+                return null
+            }
+
+            return comment[0];
+        } catch (err) {
+            console.error('Ошибка при получении комментария по ID:', err);
+            throw err;
+        }
+    }
+
     async createComment(entityType, entityId, userId, text, parentCommentId = null){
         try {
             const user = await User.findById(userId);
@@ -645,7 +737,7 @@ class MediaService {
             });
 
             await newComment.save();
-
+            return newComment._id;
         } catch (err) {
             console.error('Ошибка при создании комментария:', err);
             throw err;
