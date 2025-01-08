@@ -524,7 +524,7 @@ class MediaService {
                     $addFields: {
                         mode: {
                             $cond: {
-                                if: { $eq: ['$user_id', requester] },
+                                if: { $eq: ['$user_id', new mongoose.Types.ObjectId(requester)] },
                                 then: 'internal',
                                 else: 'external',
                             },
@@ -546,6 +546,8 @@ class MediaService {
                         text: 1,
                         isEdited: 1,
                         createdAt: 1,
+                        updatedAt: 1,
+                        isDeleted: 1,
                         mode: 1,
                         user: 1
                     }
@@ -632,7 +634,7 @@ class MediaService {
                     $addFields: {
                         mode: {
                             $cond: {
-                                if: { $eq: ['$user_id', requester] },
+                                if: { $eq: ['$user_id', new mongoose.Types.ObjectId(requester)] },
                                 then: 'internal',
                                 else: 'external',
                             },
@@ -665,7 +667,9 @@ class MediaService {
                         parentCommentId: 1,
                         text: 1,
                         isEdited: 1,
+                        isDeleted: 1,
                         createdAt: 1,
+                        updatedAt: 1,
                         mode: 1,
                         user: 1,
                         repliesCount: 1,
@@ -764,6 +768,73 @@ class MediaService {
             return await entityModel.findById(entityId);
         }catch(err){
             console.error('Ошибка при поиске инфы о юзере при ws уведомлении:', err);
+            throw err;
+        }
+    }
+
+    async deleteComment(commentId, requester){
+        try{
+            const comment = await Comment.findById(commentId);
+
+            if (!comment) {
+                throw new Error('Комментарий не найден')
+            }
+            if (comment.user_id.toString() !== requester){
+                throw new Error('Нет прав на удаление комментария')
+            }
+
+            const hasReplies = await Comment.exists({ parentCommentId: commentId });
+
+            if (hasReplies) {
+                await Comment.findByIdAndUpdate(commentId, { isDeleted: true, text: '[Комментарий удален]' });
+                return { success: true, act: 'markDeleted' };
+            } else {
+                await Comment.findByIdAndDelete(commentId);
+
+                if (comment.parentCommentId) {
+                    const parentId = comment.parentCommentId;
+
+                    const remainingReplies = await Comment.countDocuments({ parentCommentId: parentId });
+
+                    if (remainingReplies === 0) {
+                        const parentComment = await Comment.findById(parentId);
+
+                        if (parentComment && parentComment.isDeleted) {
+                            await Comment.findByIdAndDelete(parentId);
+                            return { success: true, act: 'deletedParent' };
+                        }
+                    }
+                }
+
+                return { success: true, act: 'deleted' };
+            }
+        }catch(err){
+            console.error('Ошибка при удалении комментария', err);
+            throw err;
+        }
+    }
+
+    async updateComment(newText, commentId, requester){
+        try{
+            const comment = await Comment.findById(commentId);
+
+            if (!comment) {
+                throw new Error('Комментарий не найден');
+            }
+            if (comment.user_id.toString() !== requester) {
+                throw new Error('Нет прав на редактирование комментария');
+            }
+            if (comment.isDeleted) {
+                throw new Error('Нельзя редактировать удалённый комментарий');
+            }
+
+            return await Comment.findByIdAndUpdate(
+                commentId,
+                {text: newText, isEdited: true},
+                {new: true, runValidators: true}
+            );
+        }catch(err){
+            console.error('Ошибка при изменении комментария', err);
             throw err;
         }
     }

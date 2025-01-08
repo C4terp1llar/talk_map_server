@@ -312,6 +312,42 @@ class MediaController {
         }
     }
 
+    async deleteComment(req, res) {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+        }
+
+        try {
+            const requesterUserUid = req.user.uid;
+            const {success, act} = await MediaService.deleteComment(id, requesterUserUid);
+            res.status(200).json({ success, act });
+        } catch (err) {
+            console.error('Ошибка при удалении комментария');
+            return res.status(500).json({ error: 'Ошибка при удалении комментария' });
+        }
+    }
+
+    async updateComment(req, res) {
+        const { id } = req.params;
+        const { newText } = req.body;
+
+        if (!id || !newText || !newText.length) {
+            return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+        }
+
+        try {
+            const requesterUserUid = req.user.uid;
+            const {updatedAt, text} = await MediaService.updateComment(newText, id, requesterUserUid);
+            console.log(updatedAt, text)
+            res.status(200).json({ updatedAt, text });
+        } catch (err) {
+            console.error('Ошибка при обновлении комментария');
+            return res.status(500).json({ error: 'Ошибка при обновлении комментария' });
+        }
+    }
+
 }
 
 module.exports = new MediaController();

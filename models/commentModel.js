@@ -31,11 +31,12 @@ const CommentSchema = new mongoose.Schema({
         required: true,
         default: false,
     },
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    }
-});
+    isDeleted: {
+        type: Boolean,
+        required: true,
+        default: false,
+    },
+}, {timestamps: true});
 
 CommentSchema.index({entityType: 1, entityId: 1, parentCommentId: 1});
 
