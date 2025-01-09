@@ -766,7 +766,7 @@ class MediaService {
             });
 
             await newComment.save();
-            return newComment._id;
+            return newComment;
         } catch (err) {
             console.error('Ошибка при создании комментария:', err);
             throw err;
@@ -812,11 +812,24 @@ class MediaService {
 
             if (hasReplies) {
                 await Comment.findByIdAndUpdate(commentId, { isDeleted: true, text: '[Комментарий удален]' });
+
+                asyncTaskRunner(async () => {
+                    const comment = await this.getCommentById(requester, commentId)
+                    if(comment){
+                        wsServer.emitToUser(
+                            null, `reload_comments`,
+                            {comment: comment, entity_id: comment.entityId, comment_id: commentId, act: 'change', mode: comment.parentCommentId ? 'replies' : 'comments', parentCommentId: comment.parentCommentId},
+                            requester
+                        );
+                    }
+                })
+
                 return { success: true, act: 'markDeleted' };
             } else {
                 asyncTaskRunner(async () => {
                     wsServer.emitToUser(null, `reload_comments`, {entity_id: comment.entityId, comment_id: comment._id, act: 'dec', mode: comment.parentCommentId ? 'replies' : 'comments', parentCommentId: comment.parentCommentId}, requester);
                 })
+
                 await Comment.findByIdAndDelete(commentId);
 
                 if (comment.parentCommentId) {

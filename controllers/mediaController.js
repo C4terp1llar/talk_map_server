@@ -323,14 +323,28 @@ class MediaController {
 
         try {
             const requesterUserUid = req.user.uid;
-            const newCommentId = await MediaService.createComment(entityType, entityId, requesterUserUid, text, parentCommentId)
+            const newComment = await MediaService.createComment(entityType, entityId, requesterUserUid, text, parentCommentId)
 
             asyncTaskRunner(async () => {
                 const entityOwner = await MediaService.getMediaOwnerWsInfo(entityType, entityId)
-                if(entityOwner){
-                    wsServer.emitToUser(entityOwner.user_id, `publish_comment`, {entity_id: entityId, entity_type: entityType, commentator: requesterUserUid});
+                if(entityOwner && entityOwner.user_id.toString() !== requesterUserUid){
+                    wsServer.emitToUser(
+                        entityOwner.user_id.toString(), `publish_comment`, {text: newComment.text, entity_id: entityId, entity_type: entityType, commentator: requesterUserUid}
+                    );
                 }
-                wsServer.emitToUser(null, `reload_comments`, {entity_id: entityId, comment_id: newCommentId, act: 'inc', mode: parentCommentId ? 'replies' : 'comments', parentCommentId}, requesterUserUid);
+                if(newComment && newComment.parentCommentId){
+                    const parentComment = await MediaService.getCommentById(requesterUserUid, newComment.parentCommentId.toString());
+                    if(parentComment && parentComment.user._id.toString() !== requesterUserUid){
+                        wsServer.emitToUser(
+                            parentComment.user._id.toString(), `publish_comment`,
+                            {text: newComment.text, entity_id: entityId, entity_type: entityType, commentator: requesterUserUid, isReply: true}, entityOwner.user_id.toString()
+                        );
+                    }
+                }
+                wsServer.emitToUser(
+                    null, `reload_comments`,
+                    {entity_id: entityId, comment_id: newComment._id.toString(), act: 'inc', mode: parentCommentId ? 'replies' : 'comments', parentCommentId}, requesterUserUid
+                );
             })
 
             res.status(201).json({ message: 'ok' });
@@ -369,7 +383,16 @@ class MediaController {
             const requesterUserUid = req.user.uid;
             const {updatedAt, text} = await MediaService.updateComment(newText, id, requesterUserUid);
 
-            //
+            asyncTaskRunner(async () => {
+                const comment = await MediaService.getCommentById(requesterUserUid, id)
+                if(comment){
+                    wsServer.emitToUser(
+                        null, `reload_comments`,
+                        {comment: comment, entity_id: comment.entityId, comment_id: id, act: 'change', mode: comment.parentCommentId ? 'replies' : 'comments', parentCommentId: comment.parentCommentId},
+                        requesterUserUid
+                    );
+                }
+            })
 
             res.status(200).json({ updatedAt, text });
         } catch (err) {
