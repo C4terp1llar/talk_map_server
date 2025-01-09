@@ -13,6 +13,9 @@ const Post = require('../models/postModel');
 const Comment = require('../models/commentModel');
 
 const UserService = require('../services/userService')
+const wsServer = require("../utils/wsServer");
+
+const asyncTaskRunner = require("../utils/asyncTaskRunner");
 
 class MediaService {
     async uploadToS3(file, uuid) {
@@ -239,6 +242,28 @@ class MediaService {
 
     async reactAction (entityType, entityId, userId){
         try{
+
+            let entityModel;
+
+            switch (entityType) {
+                case 'Post':
+                    entityModel = Post;
+                    break;
+                case 'Comment':
+                    entityModel = Comment;
+                    break;
+                case 'Photo':
+                    entityModel = Photo;
+                    break;
+                default:
+                    throw new Error('Неподдерживаемый тип сущности');
+            }
+
+            const entity = await entityModel.findById(entityId);
+            if (!entity) {
+                return null
+            }
+
             const exist = await Reaction.exists({ entityType, entityId, userId });
 
             if (exist) {
@@ -789,6 +814,9 @@ class MediaService {
                 await Comment.findByIdAndUpdate(commentId, { isDeleted: true, text: '[Комментарий удален]' });
                 return { success: true, act: 'markDeleted' };
             } else {
+                asyncTaskRunner(async () => {
+                    wsServer.emitToUser(null, `reload_comments`, {entity_id: comment.entityId, comment_id: comment._id, act: 'dec', mode: comment.parentCommentId ? 'replies' : 'comments', parentCommentId: comment.parentCommentId}, requester);
+                })
                 await Comment.findByIdAndDelete(commentId);
 
                 if (comment.parentCommentId) {
@@ -800,6 +828,9 @@ class MediaService {
                         const parentComment = await Comment.findById(parentId);
 
                         if (parentComment && parentComment.isDeleted) {
+                            asyncTaskRunner(async () => {
+                                wsServer.emitToUser(null, `reload_comments`, {entity_id: parentComment.entityId, comment_id: parentComment._id, act: 'dec', mode: parentComment.parentCommentId ? 'replies' : 'comments', parentCommentId: parentComment.parentCommentId}, requester);
+                            })
                             await Comment.findByIdAndDelete(parentId);
                             return { success: true, act: 'deletedParent' };
                         }

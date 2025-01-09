@@ -3,6 +3,8 @@ const MediaService = require('../services/mediaService');
 const UserService = require('../services/userService');
 const wsServer = require('../utils/wsServer')
 
+const asyncTaskRunner = require('../utils/asyncTaskRunner')
+
 async function uploadMedia(requester, files) {
     const uploads = await Promise.all(
         Object.values(files).flat().map((file) => MediaService.uploadToS3(file, requester))
@@ -130,7 +132,7 @@ class MediaController {
             const uid = req.user.uid
             const ph = await MediaService.getPhotoById(id, uid);
 
-             res.status(200).json({ photo: ph })
+            res.status(200).json({ photo: ph })
 
         } catch (err) {
             console.error(err);
@@ -162,10 +164,16 @@ class MediaController {
 
             const wasLike = await MediaService.reactAction(entityType, entityId, sender);
 
-            if (entityType){
-                const {user_id} = await MediaService.getMediaOwnerWsInfo(entityType, entityId)
-                wsServer.emitToUser(user_id, `react_media`, {entity: entityType, reactor: sender, entity_id: entityId, wasLike})
+            if (wasLike === null){
+                return res.status(400).json({ error: 'Сущности не существует' });
             }
+
+            asyncTaskRunner(async () => {
+                if (entityType){
+                    const publicationOwner = await MediaService.getMediaOwnerWsInfo(entityType, entityId)
+                    wsServer.emitToUser(publicationOwner.user_id, `react_media`, {entity: entityType, reactor: sender, entity_id: entityId, wasLike})
+                }
+            })
 
             res.status(200).json({ status: 'ok' });
         } catch (err) {
@@ -198,7 +206,10 @@ class MediaController {
 
             if (!files || Object.keys(files).length === 0) {
                 const post = await MediaService.createPost(requester, text[0])
-                await emitPublishPost(requester, post)
+                asyncTaskRunner(async () => await emitPublishPost(requester, post))
+                asyncTaskRunner(async () => {
+                    wsServer.emitToUser(null, `reload_posts`, {post_owner: requester}, requester)
+                })
                 return res.status(201).json({ post });
             }
 
@@ -213,7 +224,10 @@ class MediaController {
 
             const post = await MediaService.createPost(requester, text[0], mediaIds)
 
-            await emitPublishPost(requester, post)
+            asyncTaskRunner(async () => await emitPublishPost(requester, post))
+            asyncTaskRunner(async () => {
+                wsServer.emitToUser(null, `reload_posts`, {post_owner: requester}, requester)
+            })
 
             return res.status(201).json({ post });
         } catch (err) {
@@ -230,6 +244,11 @@ class MediaController {
         try {
             const requester = req.user.uid;
             await MediaService.deletePost(id, requester);
+
+            asyncTaskRunner(async () => {
+                wsServer.emitToUser(null, `reload_posts`, {post_id: id, post_owner: requester}, requester)
+            })
+
             res.status(204).json({ status: 'ok' });
         } catch (err) {
             console.error(err);
@@ -304,7 +323,16 @@ class MediaController {
 
         try {
             const requesterUserUid = req.user.uid;
-            await MediaService.createComment(entityType, entityId, requesterUserUid, text, parentCommentId)
+            const newCommentId = await MediaService.createComment(entityType, entityId, requesterUserUid, text, parentCommentId)
+
+            asyncTaskRunner(async () => {
+                const entityOwner = await MediaService.getMediaOwnerWsInfo(entityType, entityId)
+                if(entityOwner){
+                    wsServer.emitToUser(entityOwner.user_id, `publish_comment`, {entity_id: entityId, entity_type: entityType, commentator: requesterUserUid});
+                }
+                wsServer.emitToUser(null, `reload_comments`, {entity_id: entityId, comment_id: newCommentId, act: 'inc', mode: parentCommentId ? 'replies' : 'comments', parentCommentId}, requesterUserUid);
+            })
+
             res.status(201).json({ message: 'ok' });
         } catch (err) {
             console.error('Ошибка при создании комментария');
@@ -340,7 +368,9 @@ class MediaController {
         try {
             const requesterUserUid = req.user.uid;
             const {updatedAt, text} = await MediaService.updateComment(newText, id, requesterUserUid);
-            console.log(updatedAt, text)
+
+            //
+
             res.status(200).json({ updatedAt, text });
         } catch (err) {
             console.error('Ошибка при обновлении комментария');
