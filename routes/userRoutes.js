@@ -30,6 +30,13 @@ router.post('/getFriendReqs',authMiddleware, userController.getFriendReqs);
 router.post('/getMutualFriends',authMiddleware, userController.getMutualFriends);
 router.post('/getOneFriend',authMiddleware, userController.getOneFriend);
 
+router.get('/sessions',authMiddleware, userController.getActiveSessions);
+router.get('/sessions/:id',authMiddleware, userController.getSession);
+router.delete('/sessions/:id',authMiddleware, userController.deleteSession);
+
+router.get('/pass',authMiddleware, userController.checkPassword);
+router.put('/pass',authMiddleware, userController.changePassword);
+
 router.post('/post',authMiddleware, mediaController.createPost);
 router.get('/post',authMiddleware, mediaController.getPosts);
 router.get('/post/:id',authMiddleware, mediaController.getPost);

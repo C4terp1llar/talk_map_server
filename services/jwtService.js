@@ -78,6 +78,23 @@ class JwtService {
             throw err;
         }
     }
+
+    async updateRefreshToken(userId, device, newToken) {
+        try {
+            const result = await Token.findOneAndUpdate(
+                { user_id: userId, device },
+                { token: newToken },
+                { new: true }
+            );
+            if (!result) {
+                throw new Error('Токен не найден для обновления');
+            }
+        } catch (err) {
+            console.error('Ошибка при обновлении токена', err);
+            throw err;
+        }
+    }
+    
 }
 
 module.exports = new JwtService();

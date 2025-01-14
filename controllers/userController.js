@@ -2,6 +2,10 @@ const userService = require('../services/userService')
 const ImgService = require('../services/imgService')
 const wsServer = require('../utils/wsServer')
 
+const asyncTaskRunner = require('../utils/asyncTaskRunner')
+
+const bcrypt = require('bcrypt');
+
 class UserController {
 
     async getMainUserInfo (req, res) {
@@ -475,6 +479,104 @@ class UserController {
         }
     }
 
+    async checkPassword (req, res) {
+        const { p } = req.query;
+
+        if (!p) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try{
+            const uid = req.user.uid;
+            const oldPassword = await userService.getUserPassword(uid)
+            const match = await bcrypt.compare(p, oldPassword);
+            return res.status(200).json({match});
+        }catch (err){
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при сравнении пароля пользователя"})
+        }
+    }
+
+    async changePassword (req, res) {
+        const { p } = req.body;
+
+        if (!p) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+
+        try{
+            const uid = req.user.uid;
+
+            const oldPassword = await userService.getUserPassword(uid)
+            const match = await bcrypt.compare(p, oldPassword);
+
+            if (match){
+                return res.status(200).json({message: 'Пароль не был изменен. Новый и текущий пароли соответствуют', s: 'info'})
+            }
+
+            const newUserPassword = await bcrypt.hash(p, 5);
+            await userService.changeUserPassword(uid, newUserPassword);
+            return res.status(200).json({message: 'Пароль успешно изменен!', s: 'success'})
+        }catch (err){
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при изменении пароля пользователя"})
+        }
+    }
+
+    async getActiveSessions (req, res){
+        const { page = 1, limit = 10 } = req.query;
+        const refreshToken = req.cookies.refresh_token;
+    
+        if (!refreshToken) {
+            return res.status(400).json({ error: 'Не передан рефреш токен' });
+        }
+    
+        try {
+            const uid = req.user.uid;
+    
+            const { active, sessions, hasMore } = await userService.getActiveSessions(uid, refreshToken, +limit, +page);
+    
+            return res.status(200).json({active, sessions, hasMore});
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при получении активных сессий пользователя" });
+        }
+    }
+
+    async deleteSession (req, res){
+        const { id } = req.params;
+
+        if (!id) return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
+    
+        try {
+            const uid = req.user.uid;
+    
+            const token = await userService.deleteSession(id, uid);
+
+            asyncTaskRunner(async () => {
+                wsServer.emitToUser(req.user.uid, `session_close`, {id: id, device_info: token.device})
+            })
+
+            return res.status(200).json({message: 'ok'});
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при удалении сессии пользователя" });
+        }
+    }
+
+    async getSession (req, res){
+        const { id } = req.params;
+        const refreshToken = req.cookies.refresh_token;
+    
+        if (!refreshToken || !id) {
+            return res.status(400).json({ error: 'Нехватает данных или данные некорректны'  });
+        }
+    
+        try {
+            const uid = req.user.uid;
+            const { token, match } = await userService.getSession(id, uid, refreshToken);
+            return res.status(200).json({token, match});
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при получении активных сессий пользователя" });
+        }
+    }
 }
 
 module.exports = new UserController()

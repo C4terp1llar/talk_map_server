@@ -2,16 +2,19 @@ const User = require("../models/userModel");
 const Address = require("../models/addressModel");
 const Avatar = require("../models/avatarModel");
 const Wallpaper = require("../models/wallpaperModel");
-const ImgService = require("../services/imgService");
 const originalWallpaper = require('../models/originalWallpaperModel')
 const originalAvatar = require('../models/originalAvatarModel');
 const Tag = require("../models/tagModel");
 const friendRequest = require("../models/friendRequestModel");
 const Friend = require("../models/friendModel");
+const Token = require("../models/tokenModel");
 
 const mongoose = require('mongoose');
 
 const axios = require('axios');
+
+const ImgService = require("../services/imgService");
+const jwtService = require("./jwtService");
 
 class UserService {
     async getUserInfo(uid, mode) {
@@ -912,6 +915,128 @@ class UserService {
             throw err;
         }
     }
+
+    //сессии 
+
+    async getUserPassword (uid){
+        if (!mongoose.Types.ObjectId.isValid(uid)) throw new Error('Не передан uid');
+
+        try{
+            const {password} = await User.findById(uid).select('password -_id').lean();
+            return password.toString();
+        }catch(err){
+            console.error("Ошибка получении пароля пользователя");
+            throw err;
+        }
+    }
+
+    
+    async changeUserPassword (uid, newPassword){
+        if (!mongoose.Types.ObjectId.isValid(uid)) throw new Error('Не передан uid');
+
+        try{
+            await User.findByIdAndUpdate(uid, {password: newPassword})
+        }catch(err){
+            console.error("Ошибка изменении пароля пользователя");
+            throw err;
+        }
+    }
+
+    async getActiveSessions(uid, refreshToken, limit, page) {
+        if (!mongoose.Types.ObjectId.isValid(uid)) throw new Error('Не передан корректный uid');
+    
+        try {
+            const decodedRefreshToken = jwtService.verifyRefreshToken(refreshToken);
+
+            const [sessions, activeSession] = await Promise.all([
+                Token.aggregate([
+                    {
+                        $match: {
+                            user_id: new mongoose.Types.ObjectId(uid),
+                            device: { $ne: decodedRefreshToken.device_info } 
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 1,
+                            user_id: 1,
+                            device: 1,
+                            created: 1,
+                        },
+                    },
+                    {
+                        $sort: { created: -1 }, 
+                    },
+                    {
+                        $skip: (page - 1) * limit, 
+                    },
+                    {
+                        $limit: limit + 1, 
+                    },
+                ]),
+                Token.findOne({user_id: new mongoose.Types.ObjectId(uid), device: decodedRefreshToken.device_info}).select('_id user_id device created').lean()
+            ]) 
+    
+            if (!activeSession) throw new Error('Активная сесссия не найдена');
+
+            const hasMore = sessions.length > limit;
+    
+            if (hasMore) {
+                sessions.pop(); 
+            }
+    
+            return { active: activeSession, sessions, hasMore };
+        } catch (err) {
+            console.error("Ошибка при получении активных сессий пользователя:", err);
+            throw err;
+        }
+    }
+    
+    async deleteSession(id, uid) {
+        if (!mongoose.Types.ObjectId.isValid(uid) || !mongoose.Types.ObjectId.isValid(id)) {
+            throw new Error('Некорректный id пользователя или id сессии');
+        }
+    
+        try {
+            const token = await Token.findById(id);
+    
+            if (!token) {
+                throw new Error('Сессия не найдена');
+            }
+    
+            if (token.user_id.toString() !== uid) {
+                throw new Error('Нет прав для удаления этой сессии');
+            }
+
+            await Token.findByIdAndDelete(id);
+            return token;
+        } catch (err) {
+            console.error("Ошибка при удалении сессии пользователя:", err);
+            throw err;
+        }
+    }
+
+    async getSession(id, uid, refreshToken) {
+        if (!mongoose.Types.ObjectId.isValid(uid)) throw new Error('Не передан корректный uid');
+    
+        try {
+            console.log(id, uid, refreshToken);
+            
+            const decodedRefreshToken = jwtService.verifyRefreshToken(refreshToken);
+            const token = await Token.findById(id)
+ 
+            let match = false;
+            if ((uid === decodedRefreshToken.uid === token.user_id.toString()) && decodedRefreshToken.device_info === token.device){
+                match = true
+            }
+
+            return {token: {_id: token._id, device: token.device}, match}
+        } catch (err) {
+            console.error("Ошибка при получении сессии пользователя:", err);
+            throw err;
+        }
+    }
+    
 }
 
 module.exports = new UserService();

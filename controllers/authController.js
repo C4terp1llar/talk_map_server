@@ -85,35 +85,44 @@ class AuthController {
 
     async refresh(req, res) {
         const refreshToken = req.cookies.refresh_token;
-
+    
         if (!refreshToken) {
-            return res.status(403).json({ error: 'Нехватает данных или данные некорректны'});
+            return res.status(403).json({ error: 'Нехватает данных или данные некорректны' });
         }
-
+    
         try {
             const { uid, email, device_info } = JwtService.verifyRefreshToken(refreshToken);
-
-            await Promise.all([
-                JwtService.deleteRefreshToken(uid, device_info),
-                JwtService.clearExpiredTokens(uid)
-            ])
-
+    
+            const tokenInfo = await JwtService.getRefreshTokenByDevice(uid, device_info);
+            if (!tokenInfo) {
+                return res.status(403).json({ error: 'Токен не найден. Требуется повторный вход' });
+            }
+    
+            const tokenAgeMs = Date.now() - new Date(tokenInfo.created).getTime();
+            const maxTokenAgeMs = 15 * 24 * 60 * 60 * 1000; // 15 дней
+            if (tokenAgeMs > maxTokenAgeMs) {
+                await JwtService.deleteRefreshToken(uid, device_info);
+                return res.status(403).json({ error: 'Токен устарел. Требуется повторный вход' });
+            }
+    
+            await JwtService.clearExpiredTokens(uid);
+    
             const newAccessToken = JwtService.createAccessToken({ uid, email, device_info });
             const newRefreshToken = JwtService.createRefreshToken({ uid, email, device_info });
-
-            await RegistrationService.saveRefreshToken(uid, newRefreshToken, device_info)
-
+    
+            await JwtService.updateRefreshToken(uid, device_info, newRefreshToken);
+  
             res.cookie('refresh_token', newRefreshToken, {
                 httpOnly: true,
                 secure: true,
                 sameSite: 'None',
             });
-
+    
             res.status(200).json({ accessToken: newAccessToken });
         } catch (err) {
             if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {
-                const {uid, device_info} = jwt.decode(refreshToken)
-                await JwtService.deleteRefreshToken(uid, device_info)
+                const { uid, device_info } = jwt.decode(refreshToken);
+                await JwtService.deleteRefreshToken(uid, device_info);
                 return res.status(403).json({ error: 'Токен истек или неверен, релогин' });
             } else {
                 console.error(err);
@@ -121,6 +130,7 @@ class AuthController {
             }
         }
     }
+        
 
 
     async sync(req, res) {
