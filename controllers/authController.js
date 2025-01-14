@@ -5,6 +5,9 @@ const bcrypt = require('bcrypt');
 const JwtService = require("../services/jwtService");
 const RegistrationService = require("../services/registrationService");
 
+const wsServer = require('../utils/wsServer')
+const asyncTaskRunner = require('../utils/asyncTaskRunner')
+
 class AuthController {
     async login(req, res) {
         const { email, password, device_info } = req.body;
@@ -44,6 +47,10 @@ class AuthController {
                 refreshToken = refreshTokenForCurrentDevice.token; // если токен по инфе из реквеста существует тогда беру его (он точно не истек тк ранбше было clearExpired)
             }
 
+            asyncTaskRunner(async () => {
+                wsServer.emitToUser(uid, `sessions_reload`)
+            })
+
             res.cookie('refresh_token', refreshToken, {
                 httpOnly: true,
                 secure: true,
@@ -69,6 +76,10 @@ class AuthController {
             const { uid, device_info } = JwtService.verifyRefreshToken(refreshToken);
 
             await JwtService.deleteRefreshToken(uid, device_info)
+
+            asyncTaskRunner(async () => {
+                wsServer.emitToUser(uid, `sessions_reload`)
+            })
 
             res.clearCookie('refresh_token', {
                 httpOnly: true,

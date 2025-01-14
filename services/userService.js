@@ -584,6 +584,9 @@ class UserService {
                     }
                 },
                 {
+                    $sort: {send_time: -1},
+                },
+                {
                     $skip: (page - 1) * limit,
                 },
                 {
@@ -780,7 +783,7 @@ class UserService {
                         },
                         '_id': 0
                     }
-                },
+                }
             ]);
 
             const foundFriends = friendsOfSearchingUser.map(f => f.friendId)
