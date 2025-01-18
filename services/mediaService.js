@@ -86,8 +86,14 @@ class MediaService {
         }
     }
 
-    async getPhotos(user_id, page = 1, limit = 10) {
+    async getPhotos(user_id, page = 1, limit = 10, sort) {
         try {
+            let sortOptions = {createdAt: -1}
+
+            if (sort && sort === 'publish_asc') {
+                sortOptions = {createdAt: 1}
+            }
+
             const photos = await Photo.aggregate([
                 {$match: {user_id: new mongoose.Types.ObjectId(user_id)}},
                 {
@@ -100,7 +106,7 @@ class MediaService {
                     },
                 },
                 {
-                    $sort: {createdAt: -1}
+                    $sort: sortOptions
                 },
                 {
                     $skip: (page - 1) * limit,

@@ -87,7 +87,7 @@ class MediaController {
     }
 
     async getPhotos(req, res) {
-        const { mode, searchUid, page = 1, limit = 10 } = req.query;
+        const { mode, searchUid, page = 1, limit = 10, sort } = req.query;
 
         if (mode !== 'external' && mode !== 'internal') {
             return res.status(400).json({ error: 'Нехватает данных или данные некорректны' });
@@ -100,7 +100,7 @@ class MediaController {
                 return res.status(400).json({ error: 'Нехватает данных о пользователе.' });
             }
 
-            const { photos, hasMore } = await MediaService.getPhotos(uid, +page, +limit);
+            const { photos, hasMore } = await MediaService.getPhotos(uid, +page, +limit, sort);
 
             res.status(200).json({ photos, hasMore });
         } catch (err) {
