@@ -4,6 +4,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const userController = require('../controllers/userController');
 const mediaController = require('../controllers/mediaController');
+const cmController = require('../controllers/cmController');
 
 router.get('/getUserMainInfo',authMiddleware, userController.getMainUserInfo);
 router.post('/setWallpaper',authMiddleware, userController.setUserWallpaper);
@@ -49,11 +50,13 @@ router.patch('/comment/:id',authMiddleware, mediaController.updateComment);
 
 router.post('/photo',authMiddleware, mediaController.createPhoto);
 router.get('/photo',authMiddleware, mediaController.getPhotos);
+router.get('/photo/g',authMiddleware, mediaController.getPhotoGList);
 router.get('/photo/:id',authMiddleware, mediaController.getPhoto);
 router.delete('/photo',authMiddleware, mediaController.deletePhoto);
 
-router.get('/gPhoto',authMiddleware, mediaController.getPhotoGList);
-
 router.post('/reaction', authMiddleware, mediaController.reactionAction);
+
+router.post('/message', authMiddleware, cmController.createMessage);
+
 
 module.exports = router;

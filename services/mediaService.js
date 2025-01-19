@@ -498,9 +498,10 @@ class MediaService {
             }
 
             await Promise.all([
+                Post.findByIdAndDelete(postId).session(session),
                 Media.deleteMany({ _id: { $in: post.media } }).session(session),
                 Reaction.deleteMany({ entityType: 'Post', entityId: postId }).session(session),
-                Post.findByIdAndDelete(postId).session(session)
+                Comment.deleteMany({entityType: 'Post', entityId: postId}).session(session)
             ]);
 
             await session.commitTransaction();
