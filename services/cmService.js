@@ -1,8 +1,9 @@
 const personalConv = require("../models/personalConvModel");
 const groupConv = require("../models/groupConvModel");
 const Message = require("../models/messageModel");
+const User = require("../models/userModel");
 
-const MediaService = require('./mediaService')
+const MediaService = require("./mediaService");
 
 const mongoose = require("mongoose");
 
@@ -27,7 +28,6 @@ async function uploadMedia(requester, files) {
   );
 }
 
-
 class smService {
   async getConversations(uid, searchQ = "", page = 1, limit = 30) {
     try {
@@ -37,15 +37,21 @@ class smService {
     }
   }
 
-  async createMessage(from, to, content, files, conversationId = null, replyTo = null, chatType) {
+  async createMessage(from, to, content, files, conversationId = null, replyTo = null, chatType, msgType = 'default') {
     if (!content && !files) {
       throw new Error("Сообщение не может быть пустым");
     }
-
+  
+    if (msgType && (msgType !== 'default' && msgType !== 'system')) {
+      throw new Error("Неверный тип сообщения");
+    }
+    
     try {
       let conversation;
+      let isRead = [];  
 
       if (chatType === "personal") {
+        // личный чат
         if (conversationId) {
           conversation = await personalConv.findById(conversationId);
           if (!conversation) {
@@ -58,7 +64,7 @@ class smService {
               { user1_id: to, user2_id: from },
             ],
           });
-
+  
           if (!conversation) {
             conversation = new personalConv({
               user1_id: from,
@@ -67,48 +73,128 @@ class smService {
             await conversation.save();
           }
         }
+  
+        isRead = [
+          { user_id: from, read: true },
+          { user_id: to, read: false }
+        ];
+  
       } else if (chatType === "group" && conversationId) {
+
+        // групповой чат
         conversation = await groupConv.findById(conversationId);
         if (!conversation) {
           throw new Error("Групповой чат не найден");
         }
-
+  
         const userExists = conversation.members.some((i) => i.user_id.toString() === from.toString());
         if (!userExists) {
           throw new Error("Пользователь не может писать в этот групповой чат");
         }
+  
+        isRead = conversation.members.map((member) => ({
+          user_id: member.user_id,
+          read: member.user_id.toString() === from.toString() ? true : false,
+        }));
+  
       } else {
         throw new Error("Неверное указание чата");
       }
-
+  
       let media = [];
       if (files) {
         try {
           media = await uploadMedia(from, files);
         } catch (uploadError) {
-          throw uploadError
+          throw uploadError;
         }
       }
-
+  
       const message = new Message({
-        conversation_id: conversation._id,  
-        conversationType: chatType === "personal" ? "PersonalConversation" : "GroupConversation",         
-        user_id: from,                      
-        content,                         
-        media,                              
-        replyTo,          
+        conversation_id: conversation._id,
+        conversationType: chatType === "personal" ? "PersonalConversation" : "GroupConversation",
+        user_id: from,
+        content,
+        media,
+        replyTo,
+        messageType: msgType,
+        isRead,  
       });
-
+  
       await message.save();
-
+  
       conversation.lastMessage = message._id;
       conversation.messageCount += 1;
       await conversation.save();
-
+  
       return message;
     } catch (err) {
       console.error("Ошибка при создании сообщения:", err);
       throw err;
+    }
+  }
+  
+  async isGroupExist(requester, title) {
+    try {
+      if (!title || !title.trim() || !mongoose.Types.ObjectId.isValid(requester)) {
+        throw new Error("Обязательных данных нехватает или они не корректны");
+      }
+
+      const existingGroup = await groupConv.findOne({ owner_id: requester, title: title.trim() });
+      return !!existingGroup
+    } catch (err) {
+      console.error("Ошибка при проверке существования группы:", err.message);
+      throw new Error("Ошибка при проверке существования группы");
+    }
+  }
+
+  async createGroup(requester, members, title, description = "") {
+    try {
+      if (!title || !title.trim() || members.length < 2 || !mongoose.Types.ObjectId.isValid(requester)) {
+        throw new Error("Обязательных данных нехватает или они не корректны");
+      }
+
+      for (let i of members) {
+        if (!mongoose.Types.ObjectId.isValid(i)) {
+          throw new Error("Массив участников некорректный");
+        }
+      }
+
+      const existingGroup = await groupConv.findOne({ owner_id: requester, title: title.trim() });
+      if (existingGroup) {
+        throw new Error("Группа с таким названием у пользователя уже существует");
+      }
+
+      const membersList = [
+        {
+          user_id: requester,
+          role: "owner",
+        },
+      ];
+
+      members.forEach((member) => {
+        membersList.push({
+          user_id: member,
+          role: "member",
+        });
+      });
+
+      const newGroup = new groupConv({
+        owner_id: requester,
+        members: membersList,
+        title: title.trim(),
+        description: description.trim(),
+        messageCount: 0,
+      });
+
+      await newGroup.save();
+
+      await this.createMessage(requester, undefined, 'create_group', undefined, newGroup._id, undefined, 'group', 'system')
+
+      return newGroup;
+    } catch (err) {
+      console.error("Ошибка при создании группы:", err.message);
+      throw new Error("Ошибка при создании группы");
     }
   }
 }

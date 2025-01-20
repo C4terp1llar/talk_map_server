@@ -445,6 +445,27 @@ class UserController {
         }
     }
 
+    async getFriendsPg(req, res) {
+        const { q, page = 1, limit = 10 } = req.query;
+
+        try {
+            const uid = req.user.uid;
+
+            const isUserExist = await userService.isUserExists(uid);
+
+            if (!isUserExist) {
+                return res.status(400).json({ message: 'Пользователь не существует' });
+            }
+
+            const {friends, hasMore} = await userService.getFriendsWithPagination(uid, q, +page, +limit);
+
+            return res.status(200).json({friends, hasMore});
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при получении друзей"})
+        }
+    }
+
     async getOneFriend(req, res) {
         const { targetUid, needMutual } = req.body;
 

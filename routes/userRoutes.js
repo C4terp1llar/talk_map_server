@@ -29,7 +29,9 @@ router.post('/submitFriendRequest',authMiddleware, userController.submitFriendRe
 router.post('/deleteFriendship',authMiddleware, userController.deleteFriendship);
 router.post('/getFriendReqs',authMiddleware, userController.getFriendReqs);
 router.post('/getMutualFriends',authMiddleware, userController.getMutualFriends);
-router.post('/getOneFriend',authMiddleware, userController.getOneFriend);
+router.post('/getOneFriend', authMiddleware, userController.getOneFriend);
+
+router.get('/friend',authMiddleware, userController.getFriendsPg);
 
 router.get('/sessions',authMiddleware, userController.getActiveSessions);
 router.get('/sessions/:id',authMiddleware, userController.getSession);
@@ -57,6 +59,8 @@ router.delete('/photo',authMiddleware, mediaController.deletePhoto);
 router.post('/reaction', authMiddleware, mediaController.reactionAction);
 
 router.post('/message', authMiddleware, cmController.createMessage);
+
+router.get('/group/check', authMiddleware, cmController.checkGroup);
 
 
 module.exports = router;

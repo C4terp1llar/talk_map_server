@@ -5,7 +5,7 @@ const GroupConversationSchema = new mongoose.Schema(
     owner_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true, 
+      required: true,
     },
     members: [
       {
@@ -17,7 +17,7 @@ const GroupConversationSchema = new mongoose.Schema(
         role: {
           type: String,
           enum: ["owner", "admin", "member"],
-          default: "member", 
+          default: "member",
         },
       },
     ],
@@ -33,7 +33,7 @@ const GroupConversationSchema = new mongoose.Schema(
     description: {
       type: String,
       required: false,
-    },    
+    },
     messageCount: {
       type: Number,
       default: 0,
@@ -42,7 +42,7 @@ const GroupConversationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-GroupConversationSchema.index({ "members.user_id": 1 });
+GroupConversationSchema.index({ owner_id: 1, title: 1 }, { unique: true });
 
 const GroupConversation = mongoose.model("GroupConversation", GroupConversationSchema, "GroupConversations");
 

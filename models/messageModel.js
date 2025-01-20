@@ -31,10 +31,22 @@ const MessageSchema = new mongoose.Schema({
     ref: "Message",
     default: null,
   },
-  isRead: {
-    type: Boolean,
-    default: false,
+  messageType: {
+    type: String,
+    enum: ["default", "system"], 
+    default: "default", 
   },
+  isRead: [{
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    read: {
+      type: Boolean,
+      default: false,
+    },
+  }],
   isEdited: {
     type: Boolean,
     default: false,
