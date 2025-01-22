@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const {PutObjectCommand, DeleteObjectCommand} = require('@aws-sdk/client-s3');
 const {v4: uuidv4} = require('uuid');
 const s3Client = require('../utils/s3Client');
@@ -52,6 +53,44 @@ class MediaService {
             try {
                 if (fs.existsSync(file.filepath)) {
                     await fs.promises.unlink(file.filepath);
+                }
+            } catch (unlinkError) {
+                console.error("Ошибка при удалении временного файла:", unlinkError);
+            }
+        }
+    }
+
+    async uploadBase64ToS3(base64Data, uuid) {
+        const matches = base64Data.match(/^data:(.+);base64,(.+)$/);
+        if (!matches || matches.length !== 3) {
+            throw new Error("Неверный формат Base64 данных");
+        }
+
+        const mimeType = matches[1]; 
+        const base64Content = matches[2]; 
+
+        const tempFileName = `${uuidv4()}.${mimeType.split('/')[1]}`; 
+        const tempFilePath = path.join('./uploads', tempFileName);
+
+        try {
+            const buffer = Buffer.from(base64Content, 'base64');
+            await fs.promises.writeFile(tempFilePath, buffer);
+
+            const file = {
+                filepath: tempFilePath,
+                mimetype: mimeType,
+                originalFilename: tempFileName,
+                size: buffer.length,
+            };
+
+            return await this.uploadToS3(file, uuid);
+        } catch (err) {
+            console.error("Ошибка при обработке Base64 и загрузке на S3:", err);
+            throw err;
+        } finally {
+            try {
+                if (fs.existsSync(tempFilePath)) {
+                    await fs.promises.unlink(tempFilePath);
                 }
             } catch (unlinkError) {
                 console.error("Ошибка при удалении временного файла:", unlinkError);

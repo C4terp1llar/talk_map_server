@@ -26,6 +26,11 @@ const GroupConversationSchema = new mongoose.Schema(
       ref: "Message",
       default: null,
     },
+    cover_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Media",
+      required: true,
+    },
     title: {
       type: String,
       required: true,
@@ -33,6 +38,10 @@ const GroupConversationSchema = new mongoose.Schema(
     description: {
       type: String,
       required: false,
+    },
+    cover_url: {
+      type: String,
+      required: true,
     },
     messageCount: {
       type: Number,

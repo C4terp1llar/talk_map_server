@@ -775,6 +775,9 @@ class UserService {
           },
         },
         {
+          $sort: { createdAt: -1 }
+        },
+        {
           $project: {
             friendId: {
               $cond: {

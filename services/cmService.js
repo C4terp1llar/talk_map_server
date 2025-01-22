@@ -4,7 +4,7 @@ const Message = require("../models/messageModel");
 const User = require("../models/userModel");
 
 const MediaService = require("./mediaService");
-
+const generateBase64Cover = require("../utils/generateCover");
 const mongoose = require("mongoose");
 
 async function uploadMedia(requester, files) {
@@ -37,18 +37,18 @@ class smService {
     }
   }
 
-  async createMessage(from, to, content, files, conversationId = null, replyTo = null, chatType, msgType = 'default') {
+  async createMessage(from, to, content, files, conversationId = null, replyTo = null, chatType, msgType = "default") {
     if (!content && !files) {
       throw new Error("Сообщение не может быть пустым");
     }
-  
-    if (msgType && (msgType !== 'default' && msgType !== 'system')) {
+
+    if (msgType && msgType !== "default" && msgType !== "system") {
       throw new Error("Неверный тип сообщения");
     }
-    
+
     try {
       let conversation;
-      let isRead = [];  
+      let isRead = [];
 
       if (chatType === "personal") {
         // личный чат
@@ -64,7 +64,7 @@ class smService {
               { user1_id: to, user2_id: from },
             ],
           });
-  
+
           if (!conversation) {
             conversation = new personalConv({
               user1_id: from,
@@ -73,34 +73,31 @@ class smService {
             await conversation.save();
           }
         }
-  
+
         isRead = [
           { user_id: from, read: true },
-          { user_id: to, read: false }
+          { user_id: to, read: false },
         ];
-  
       } else if (chatType === "group" && conversationId) {
-
         // групповой чат
         conversation = await groupConv.findById(conversationId);
         if (!conversation) {
           throw new Error("Групповой чат не найден");
         }
-  
+
         const userExists = conversation.members.some((i) => i.user_id.toString() === from.toString());
         if (!userExists) {
           throw new Error("Пользователь не может писать в этот групповой чат");
         }
-  
+
         isRead = conversation.members.map((member) => ({
           user_id: member.user_id,
           read: member.user_id.toString() === from.toString() ? true : false,
         }));
-  
       } else {
         throw new Error("Неверное указание чата");
       }
-  
+
       let media = [];
       if (files) {
         try {
@@ -109,7 +106,7 @@ class smService {
           throw uploadError;
         }
       }
-  
+
       const message = new Message({
         conversation_id: conversation._id,
         conversationType: chatType === "personal" ? "PersonalConversation" : "GroupConversation",
@@ -118,22 +115,22 @@ class smService {
         media,
         replyTo,
         messageType: msgType,
-        isRead,  
+        isRead,
       });
-  
+
       await message.save();
-  
+
       conversation.lastMessage = message._id;
       conversation.messageCount += 1;
       await conversation.save();
-  
+
       return message;
     } catch (err) {
       console.error("Ошибка при создании сообщения:", err);
       throw err;
     }
   }
-  
+
   async isGroupExist(requester, title) {
     try {
       if (!title || !title.trim() || !mongoose.Types.ObjectId.isValid(requester)) {
@@ -141,14 +138,14 @@ class smService {
       }
 
       const existingGroup = await groupConv.findOne({ owner_id: requester, title: title.trim() });
-      return !!existingGroup
+      return !!existingGroup;
     } catch (err) {
       console.error("Ошибка при проверке существования группы:", err.message);
       throw new Error("Ошибка при проверке существования группы");
     }
   }
 
-  async createGroup(requester, members, title, description = "") {
+  async createGroup(requester, members, title, description = "", cover = "") {
     try {
       if (!title || !title.trim() || members.length < 2 || !mongoose.Types.ObjectId.isValid(requester)) {
         throw new Error("Обязательных данных нехватает или они не корректны");
@@ -179,17 +176,36 @@ class smService {
         });
       });
 
+      let currentCover;
+      if (cover && cover.match(/^data:(.+);base64,(.+)$/)) {
+        currentCover = await MediaService.uploadBase64ToS3(cover, requester);
+      } else {
+        const generateCover = generateBase64Cover(title.trim().charAt(0));
+        currentCover = await MediaService.uploadBase64ToS3(generateCover, requester);
+      }
+
+      const currentMediaCover = await MediaService.createMedia(
+        requester,
+        currentCover.client_filename,
+        currentCover.client_file_type,
+        currentCover.client_file_size,
+        currentCover.store_filename,
+        currentCover.store_url
+      );
+
       const newGroup = new groupConv({
         owner_id: requester,
         members: membersList,
         title: title.trim(),
         description: description.trim(),
         messageCount: 0,
+        cover_id: currentMediaCover._id,
+        cover_url: currentMediaCover.store_url
       });
 
       await newGroup.save();
 
-      await this.createMessage(requester, undefined, 'create_group', undefined, newGroup._id, undefined, 'group', 'system')
+      await this.createMessage(requester, undefined, "create_group", undefined, newGroup._id, undefined, "group", "system");
 
       return newGroup;
     } catch (err) {

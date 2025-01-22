@@ -53,8 +53,15 @@ class cmController {
     }
   }
 
-  async createGroup() {
+  async createGroup(req, res) {
+    const { title, description, members, cover } = req.body;
+
+    if (!title || !members) return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+
     try {
+      const uid = req.user.uid;
+      await cmService.createGroup(uid, members, title, description, cover)
+      return res.status(201).json({ msg: 'ok' });
     } catch (err) {
       console.error("Ошибка при создании группы:", err.message);
       return res.status(500).json({ error: "Ошибка при создании группы" });

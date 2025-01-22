@@ -460,6 +460,7 @@ class UserController {
             const {friends, hasMore} = await userService.getFriendsWithPagination(uid, q, +page, +limit);
 
             return res.status(200).json({friends, hasMore});
+
         } catch (err) {
             console.error(err);
             return res.status(500).json({ error: "Ошибка при получении друзей"})
