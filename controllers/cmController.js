@@ -74,9 +74,9 @@ class cmController {
     try {
       const uid = req.user.uid;
 
-      const convs = await cmService.getConversations(uid, q, +page, +limit);
+      const {conversations, hasMore} = await cmService.getConversations(uid, q, +page, +limit);
 
-      res.status(200).json({ convs });
+      res.status(200).json({ conversations, hasMore });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "Ошибка при получении диалогов" });
