@@ -81,26 +81,35 @@ class smService {
                 {
                     $lookup: {
                         from: "messages",
-                        let: {convId: "$_id"},
+                        let: { convId: "$_id" },
                         pipeline: [
                             {
                                 $match: {
                                     $expr: {
                                         $and: [
-                                            {$eq: ["$conversation_id", "$$convId"]},
+                                            { $eq: ["$conversation_id", "$$convId"] },
+                                            { $eq: ["$conversationType", "PersonalConversation"] },
                                             {
                                                 $not: {
-                                                    $in: [
-                                                        new mongoose.Types.ObjectId(requester),
-                                                        {$map: {input: "$isRead", as: "read", in: "$$read.user_id"}},
-                                                    ],
+                                                    $anyElementTrue: {
+                                                        $map: {
+                                                            input: "$isRead",
+                                                            as: "readInfo",
+                                                            in: {
+                                                                $and: [
+                                                                    { $eq: ["$$readInfo.user_id", new mongoose.Types.ObjectId(requester)] },
+                                                                    { $eq: ["$$readInfo.read", true] },
+                                                                ],
+                                                            },
+                                                        },
+                                                    },
                                                 },
                                             },
                                         ],
                                     },
                                 },
                             },
-                            {$count: "unreadCount"},
+                            { $count: "unreadCount" },
                         ],
                         as: "unreadMessages",
                     },
@@ -130,6 +139,7 @@ class smService {
                         lastMessage: {
                             _id: "$lastMessageInfo._id",
                             sender: "$lastMessageInfo.user_id",
+                            sender_nickname: "$userInfo.nickname",
                             content: "$lastMessageInfo.content",
                             sendTime: "$lastMessageInfo.updatedAt",
                             messageType: "$lastMessageInfo.messageType",
@@ -223,26 +233,38 @@ class smService {
                 {
                     $lookup: {
                         from: "messages",
-                        let: {convId: "$_id"},
+                        let: { convId: "$_id" },
                         pipeline: [
                             {
                                 $match: {
                                     $expr: {
-                                        $and: [
-                                            {$eq: ["$conversation_id", "$$convId"]},
-                                            {
-                                                $not: {
-                                                    $in: [
-                                                        new mongoose.Types.ObjectId(requester),
-                                                        {$map: {input: "$isRead", as: "read", in: "$$read.user_id"}},
-                                                    ],
-                                                },
-                                            },
-                                        ],
+                                        $eq: ["$conversation_id", "$$convId"],
                                     },
                                 },
                             },
-                            {$count: "unreadCount"},
+                            {
+                                $addFields: {
+                                    unreadCount: {
+                                        $size: {
+                                            $filter: {
+                                                input: "$isRead",
+                                                as: "readInfo",
+                                                cond: {
+                                                    $and: [
+                                                        { $eq: ["$$readInfo.user_id", new mongoose.Types.ObjectId(requester)] },
+                                                        { $eq: ["$$readInfo.read", false] },
+                                                    ],
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            {
+                                $match: {
+                                    unreadCount: { $gt: 0 },
+                                },
+                            },
                         ],
                         as: "unreadMessages",
                     },
@@ -262,10 +284,25 @@ class smService {
                     },
                 },
                 {
+                    $lookup: {
+                        from: "users",
+                        localField: "lastMessageInfo.user_id",
+                        foreignField: "_id",
+                        as: "userInfo",
+                    },
+                },
+                {
+                    $unwind: {
+                        path: "$userInfo",
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
                     $addFields: {
                         lastMessageDetail: {
                             _id: "$lastMessageInfo._id",
                             sender: "$lastMessageInfo.user_id",
+                            sender_nickname: "$userInfo.nickname",
                             content: "$lastMessageInfo.content",
                             sendTime: "$lastMessageInfo.updatedAt",
                             messageType: "$lastMessageInfo.messageType",
