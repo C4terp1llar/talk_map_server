@@ -129,6 +129,14 @@ class smService {
                     },
                 },
                 {
+                    $lookup: {
+                        from: "media",
+                        localField: "lastMessageInfo.media",
+                        foreignField: "_id",
+                        as: "lastMessageMedia",
+                    },
+                },
+                {
                     $addFields: {
                         opponent: {
                             _id: "$userInfo._id",
@@ -148,6 +156,19 @@ class smService {
                                     if: {$eq: ['$lastMessageInfo.user_id', new mongoose.Types.ObjectId(requester)]},
                                     then: 'internal',
                                     else: 'external',
+                                },
+                            },
+                            media: {
+                                $map: {
+                                    input: "$lastMessageMedia",
+                                    as: "mediaItem",
+                                    in: {
+                                        _id: "$$mediaItem._id",
+                                        name: "$$mediaItem.client_filename",
+                                        type: "$$mediaItem.client_file_type",
+                                        size: "$$mediaItem.client_file_size",
+                                        url: "$$mediaItem.store_url",
+                                    },
                                 },
                             },
                             isRead: {

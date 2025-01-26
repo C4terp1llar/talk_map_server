@@ -25,7 +25,7 @@ class cmController {
       const replyTo = fields.replyTo && fields.replyTo[0] ? fields.replyTo[0] : null;
       const convId = fields.convId && fields.convId[0] ? fields.convId[0] : null;
 
-      if (!content || !chatType || (chatType !== "personal" && chatType !== "group") || (chatType === "group" && !convId)) {
+      if ((!content && !files) || !chatType || (chatType !== "personal" && chatType !== "group") || (chatType === "group" && !convId)) {
         return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
       }
 
