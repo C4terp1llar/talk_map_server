@@ -151,6 +151,7 @@ class smService {
                             content: "$lastMessageInfo.content",
                             sendTime: "$lastMessageInfo.updatedAt",
                             messageType: "$lastMessageInfo.messageType",
+                            additionalInfo: "$lastMessageInfo.additionalInfo",
                             mode: {
                                 $cond: {
                                     if: {$eq: ['$lastMessageInfo.user_id', new mongoose.Types.ObjectId(requester)]},
@@ -319,6 +320,14 @@ class smService {
                     },
                 },
                 {
+                    $lookup: {
+                        from: "media",
+                        localField: "lastMessageInfo.media",
+                        foreignField: "_id",
+                        as: "lastMessageMedia",
+                    },
+                },
+                {
                     $addFields: {
                         lastMessageDetail: {
                             _id: "$lastMessageInfo._id",
@@ -327,11 +336,25 @@ class smService {
                             content: "$lastMessageInfo.content",
                             sendTime: "$lastMessageInfo.updatedAt",
                             messageType: "$lastMessageInfo.messageType",
+                            additionalInfo: "$lastMessageInfo.additionalInfo",
                             mode: {
                                 $cond: {
                                     if: {$eq: ['$lastMessageInfo.user_id', new mongoose.Types.ObjectId(requester)]},
                                     then: 'internal',
                                     else: 'external',
+                                },
+                            },
+                            media: {
+                                $map: {
+                                    input: "$lastMessageMedia",
+                                    as: "mediaItem",
+                                    in: {
+                                        _id: "$$mediaItem._id",
+                                        name: "$$mediaItem.client_filename",
+                                        type: "$$mediaItem.client_file_type",
+                                        size: "$$mediaItem.client_file_size",
+                                        url: "$$mediaItem.store_url",
+                                    },
                                 },
                             },
                             isRead: {
@@ -435,7 +458,7 @@ class smService {
         }
     }
 
-    async createMessage(from, to, content, files, conversationId = null, replyTo = null, chatType, msgType = "default") {
+    async createMessage(from, to, content, files, conversationId = null, replyTo = null, chatType, msgType = "default", addInfo = null ) {
         if (!content && !files) {
             throw new Error("Сообщение не может быть пустым");
         }
@@ -490,7 +513,7 @@ class smService {
 
                 isRead = conversation.members.map((member) => ({
                     user_id: member.user_id,
-                    read: member.user_id.toString() === from.toString() ? true : false,
+                    read: member.user_id.toString() === from.toString(),
                 }));
             } else {
                 throw new Error("Неверное указание чата");
@@ -513,6 +536,7 @@ class smService {
                 media,
                 replyTo,
                 messageType: msgType,
+                additionalInfo: addInfo,
                 isRead,
             });
 
@@ -603,7 +627,10 @@ class smService {
 
             await newGroup.save();
 
-            await this.createMessage(requester, undefined, "create_group", undefined, newGroup._id, undefined, "group", "system");
+            await this.createMessage(
+                requester, undefined, "create_group", undefined, newGroup._id, undefined, "group",
+                "system", `group_title:${title}`,
+                );
 
             return newGroup;
         } catch (err) {

@@ -36,6 +36,11 @@ const MessageSchema = new mongoose.Schema({
     enum: ["default", "system"], 
     default: "default", 
   },
+  additionalInfo: {
+    type: String,
+    required: false,
+    default: null,
+  },
   isRead: [{
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
