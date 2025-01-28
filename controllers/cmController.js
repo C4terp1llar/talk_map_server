@@ -82,6 +82,27 @@ class cmController {
       return res.status(500).json({ error: "Ошибка при получении диалогов" });
     }
   }
+
+  async getConversationMessages(req, res) {
+    const { convId, page = 1, limit = 200 } = req.query;
+
+    if (!convId) return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+
+    try {
+      const uid = req.user.uid;
+
+      const messageSnap = await cmService.getMessages(uid, convId, +page, +limit);
+
+      if (messageSnap.error && messageSnap.error === '400') {
+        return res.status(400).json({ error: "Данные о диологе некорректны" });
+      }
+
+      res.status(200).json({ messages: messageSnap.messages , hasMore: messageSnap.hasMore });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Ошибка при получении сообщений" });
+    }
+  }
 }
 
 module.exports = new cmController();

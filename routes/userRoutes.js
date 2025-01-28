@@ -59,6 +59,7 @@ router.delete('/photo',authMiddleware, mediaController.deletePhoto);
 router.post('/reaction', authMiddleware, mediaController.reactionAction);
 
 router.post('/message', authMiddleware, cmController.createMessage);
+router.get('/message', authMiddleware, cmController.getConversationMessages);
 
 router.get('/group/check', authMiddleware, cmController.checkGroup);
 router.post('/group', authMiddleware, cmController.createGroup);

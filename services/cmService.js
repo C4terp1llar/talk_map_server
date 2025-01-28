@@ -638,6 +638,178 @@ class smService {
             throw new Error("Ошибка при создании группы");
         }
     }
+
+    async getMessages(requester, convId, page = 1, limit = 200) {
+        if (!mongoose.Types.ObjectId.isValid(requester) || !mongoose.Types.ObjectId.isValid(convId)) {
+            return { error: '400', message: 'Некорректный id диалога' };
+        }
+
+        try {
+            const [p, g] = await Promise.all([
+                personalConv.exists({ _id: new mongoose.Types.ObjectId(convId) }),
+                groupConv.exists({ _id: new mongoose.Types.ObjectId(convId) }),
+            ]);
+
+            if (!p && !g) {
+                return { error: '400', message: 'Диалог с таким id несуществует' };
+            }
+
+            const messages = await Message.aggregate([
+                {
+                    $match: {
+                        conversation_id: new mongoose.Types.ObjectId(convId),
+                        conversationType: p ? "PersonalConversation" : "GroupConversation",
+                        isDeleted: false,
+                    }
+                },
+                // развертываем информацию о читателях сообщения
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "isRead.user_id",
+                        foreignField: "_id",
+                        as: "readersInfo",
+                    }
+                },
+                {
+                    $unwind: {
+                        path: "$readersInfo",
+                        preserveNullAndEmptyArrays: true,
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "avatars",
+                        localField: "readersInfo._id",
+                        foreignField: "user_id",
+                        as: "readerAvatars",
+                    }
+                },
+                {
+                    $unwind: {
+                        path: "$readerAvatars",
+                        preserveNullAndEmptyArrays: true,
+                    }
+                },
+                {
+                    $addFields: {
+                        readers: {
+                            $map: {
+                                input: "$isRead",
+                                as: "readEntry",
+                                in: {
+                                    user_id: "$$readEntry.user_id",
+                                    read: "$$readEntry.read",
+                                    userInfo: {
+                                        nickname: "$readersInfo.nickname",
+                                        nickname_color: "$readersInfo.nickname_color",
+                                        avatar: "$readerAvatars.asset_url",
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
+                // развертываем информацию о отправителе и самом сообщении
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "user_id",
+                        foreignField: "_id",
+                        as: "senderInfo",
+                    }
+                },
+                {
+                    $unwind: {
+                        path: "$senderInfo",
+                        preserveNullAndEmptyArrays: true,
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "avatars",
+                        localField: "user_id",
+                        foreignField: "user_id",
+                        as: "senderAvatarInfo",
+                    }
+                },
+                {
+                    $unwind: {
+                        path: "$senderAvatarInfo",
+                        preserveNullAndEmptyArrays: true,
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "media",
+                        localField: "media",
+                        foreignField: "_id",
+                        as: "messageMedia",
+                    }
+                },
+                {
+                    $addFields: {
+                        sender: {
+                            _id: "user_id",
+                            nickname: "$senderInfo.nickname",
+                            nickname_color: "$senderInfo.nickname_color",
+                            avatar: "$senderAvatarInfo.asset_url",
+                        },
+                        mode: {
+                            $cond: {
+                                if: { $eq: ["$user_id", new mongoose.Types.ObjectId(requester)] },
+                                then: "internal",
+                                else: "external",
+                            },
+                        },
+                        mediaInfo: {
+                            $map: {
+                                input: "$messageMedia",
+                                as: "mediaItem",
+                                in: {
+                                    _id: "$$mediaItem._id",
+                                    name: "$$mediaItem.client_filename",
+                                    type: "$$mediaItem.client_file_type",
+                                    size: "$$mediaItem.client_file_size",
+                                    url: "$$mediaItem.store_url",
+                                }
+                            }
+                        },
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        conversation_id: 1,
+                        conversationType: 1,
+                        content: 1,
+                        replyTo: 1,
+                        messageType: 1,
+                        additionalInfo: 1,
+                        isEdited: 1,
+                        isDeleted: 1,
+                        isForwarded: 1,
+                        updatedAt: 1,
+                        createdAt: 1,
+                        sender: 1,
+                        mode: 1,
+                        mediaInfo: 1,
+                        readers: 1
+                    }
+                },
+                { $sort: { createdAt: -1 } },
+                { $skip: (page - 1) * limit },
+                { $limit: limit }
+            ]);
+
+            const hasMore = messages.length === limit;
+
+            return { messages, hasMore };
+        } catch (err) {
+            console.error("Ошибка при получении сообщений из диалога:", err.message);
+            throw new Error("Ошибка при получении сообщений из диалога");
+        }
+    }
 }
 
 module.exports = new smService();
