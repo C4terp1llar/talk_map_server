@@ -103,6 +103,27 @@ class cmController {
       return res.status(500).json({ error: "Ошибка при получении сообщений" });
     }
   }
+
+  async getConversationInfo(req, res) {
+    const { id } = req.params;
+
+    if (!id) return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+
+    try {
+      const uid = req.user.uid;
+
+      const dialogSnap = await cmService.getUserDialog(uid, id);
+
+      if (dialogSnap.error && dialogSnap.error === '400') {
+        return res.status(400).json({ error: "Данные о запрашиваемом диологе некорректны" });
+      }
+
+      res.status(200).json({ dialog: dialogSnap.dialog });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Ошибка при получении диалога" });
+    }
+  }
 }
 
 module.exports = new cmController();

@@ -10,19 +10,28 @@ const uploadMedia = require('../utils/uploadMedia');
 
 class smService {
 
-    async getPersonalConversations(requester, q = "", page = 1, limit = 30) {
+    async getPersonalConversations(requester, q = "", page = 1, limit = 30, byId) {
         if (!mongoose.Types.ObjectId.isValid(requester)) {
             throw new Error("Некорректный uid");
         }
         try {
+
+            let matchCase = {
+                $or: [
+                    {user1_id: new mongoose.Types.ObjectId(requester)},
+                    {user2_id: new mongoose.Types.ObjectId(requester)},
+                ],
+            };
+
+            if (byId){
+                matchCase = {
+                    _id: new mongoose.Types.ObjectId(byId),
+                };
+            }
+
             const personal = await personalConv.aggregate([
                 {
-                    $match: {
-                        $or: [
-                            {user1_id: new mongoose.Types.ObjectId(requester)},
-                            {user2_id: new mongoose.Types.ObjectId(requester)},
-                        ],
-                    },
+                    $match: matchCase
                 },
                 {
                     $project: {
@@ -229,16 +238,24 @@ class smService {
         }
     }
 
-    async getGroupConversations(requester, q = "", page = 1, limit = 30) {
+    async getGroupConversations(requester, q = "", page = 1, limit = 30, byId) {
         if (!mongoose.Types.ObjectId.isValid(requester)) {
             throw new Error("Некорректный uid");
         }
         try {
+            let matchCase = {
+                "members.user_id": new mongoose.Types.ObjectId(requester),
+            };
+
+            if (byId){
+                matchCase = {
+                    _id: new mongoose.Types.ObjectId(byId),
+                };
+            }
+
             const groups = await groupConv.aggregate([
                 {
-                    $match: {
-                        "members.user_id": new mongoose.Types.ObjectId(requester),
-                    },
+                    $match: matchCase
                 },
                 ...(q
                     ? [
@@ -639,30 +656,54 @@ class smService {
         }
     }
 
-    async getMessages(requester, convId, page = 1, limit = 200) {
-        if (!mongoose.Types.ObjectId.isValid(requester) || !mongoose.Types.ObjectId.isValid(convId)) {
-            return { error: '400', message: 'Некорректный id диалога' };
-        }
-
+    async checkDialog(requester, convId) {
         try {
             const [p, g] = await Promise.all([
-                personalConv.exists({ _id: new mongoose.Types.ObjectId(convId) }),
-                groupConv.exists({ _id: new mongoose.Types.ObjectId(convId) }),
+                personalConv.findById(convId),
+                groupConv.findById(convId),
             ]);
 
             if (!p && !g) {
                 return { error: '400', message: 'Диалог с таким id несуществует' };
             }
 
+            let isParticipant = false;
+
+            if (p) {
+                isParticipant = String(p.user1_id) === requester || String(p.user2_id) === requester;
+            } else if (g) {
+                isParticipant = g.members.some(member => String(member.user_id) === requester);
+            }
+
+            if (!isParticipant) {
+                return { error: '400', message: 'Пользователь не является участником запрашиваемого диалога' };
+            }
+
+            return p ? "PersonalConversation" : "GroupConversation"
+        } catch (err) {
+            console.error("Ошибка при проверке запрашиваемого диалога пользователя:", err.message);
+            throw new Error("Ошибка при проверке запрашиваемого диалога пользователя");
+        }
+    }
+
+    async getMessages(requester, convId, page = 1, limit = 200) {
+        if (!mongoose.Types.ObjectId.isValid(requester) || !mongoose.Types.ObjectId.isValid(convId)) {
+            return { error: '400', message: 'Некорректный id диалога' };
+        }
+
+        try {
+            const checkSnap = await this.checkDialog(requester, convId);
+            if (checkSnap.error) return { ...checkSnap };
+
             const messages = await Message.aggregate([
                 {
                     $match: {
                         conversation_id: new mongoose.Types.ObjectId(convId),
-                        conversationType: p ? "PersonalConversation" : "GroupConversation",
+                        conversationType: checkSnap,
                         isDeleted: false,
                     }
                 },
-                // развертываем информацию о читателях сообщения
+                // инф о читателях сообщения
                 {
                     $lookup: {
                         from: "users",
@@ -672,23 +713,11 @@ class smService {
                     }
                 },
                 {
-                    $unwind: {
-                        path: "$readersInfo",
-                        preserveNullAndEmptyArrays: true,
-                    }
-                },
-                {
                     $lookup: {
                         from: "avatars",
                         localField: "readersInfo._id",
                         foreignField: "user_id",
                         as: "readerAvatars",
-                    }
-                },
-                {
-                    $unwind: {
-                        path: "$readerAvatars",
-                        preserveNullAndEmptyArrays: true,
                     }
                 },
                 {
@@ -701,16 +730,16 @@ class smService {
                                     user_id: "$$readEntry.user_id",
                                     read: "$$readEntry.read",
                                     userInfo: {
-                                        nickname: "$readersInfo.nickname",
-                                        nickname_color: "$readersInfo.nickname_color",
-                                        avatar: "$readerAvatars.asset_url",
+                                        nickname: { $arrayElemAt: ["$readersInfo.nickname", 0] },
+                                        nickname_color: { $arrayElemAt: ["$readersInfo.nickname_color", 0] },
+                                        avatar: { $arrayElemAt: ["$readerAvatars.asset_url", 0] },
                                     }
                                 }
                             }
                         },
                     }
                 },
-                // развертываем информацию о отправителе и самом сообщении
+                // инф  о отправителе и сообщении
                 {
                     $lookup: {
                         from: "users",
@@ -720,23 +749,11 @@ class smService {
                     }
                 },
                 {
-                    $unwind: {
-                        path: "$senderInfo",
-                        preserveNullAndEmptyArrays: true,
-                    }
-                },
-                {
                     $lookup: {
                         from: "avatars",
                         localField: "user_id",
                         foreignField: "user_id",
                         as: "senderAvatarInfo",
-                    }
-                },
-                {
-                    $unwind: {
-                        path: "$senderAvatarInfo",
-                        preserveNullAndEmptyArrays: true,
                     }
                 },
                 {
@@ -750,10 +767,10 @@ class smService {
                 {
                     $addFields: {
                         sender: {
-                            _id: "user_id",
-                            nickname: "$senderInfo.nickname",
-                            nickname_color: "$senderInfo.nickname_color",
-                            avatar: "$senderAvatarInfo.asset_url",
+                            _id: "$user_id",
+                            nickname: { $arrayElemAt: ["$senderInfo.nickname", 0] },
+                            nickname_color: { $arrayElemAt: ["$senderInfo.nickname_color", 0] },
+                            avatar: { $arrayElemAt: ["$senderAvatarInfo.asset_url", 0] },
                         },
                         mode: {
                             $cond: {
@@ -797,7 +814,27 @@ class smService {
                         readers: 1
                     }
                 },
-                { $sort: { createdAt: -1 } },
+                {
+                    $group: {
+                        _id: "$_id",
+                        conversation_id: { $first: "$conversation_id" },
+                        conversationType: { $first: "$conversationType" },
+                        content: { $first: "$content" },
+                        replyTo: { $first: "$replyTo" },
+                        messageType: { $first: "$messageType" },
+                        additionalInfo: { $first: "$additionalInfo" },
+                        isEdited: { $first: "$isEdited" },
+                        isDeleted: { $first: "$isDeleted" },
+                        isForwarded: { $first: "$isForwarded" },
+                        updatedAt: { $first: "$updatedAt" },
+                        createdAt: { $first: "$createdAt" },
+                        sender: { $first: "$sender" },
+                        mode: { $first: "$mode" },
+                        mediaInfo: { $first: "$mediaInfo" },
+                        readers: { $first: "$readers" }
+                    }
+                },
+                { $sort: { createdAt: 1 } },
                 { $skip: (page - 1) * limit },
                 { $limit: limit }
             ]);
@@ -810,6 +847,36 @@ class smService {
             throw new Error("Ошибка при получении сообщений из диалога");
         }
     }
+
+
+    async getUserDialog(requester, convId) {
+        if (!mongoose.Types.ObjectId.isValid(requester) || !mongoose.Types.ObjectId.isValid(convId)) {
+            return { error: '400', message: 'Некорректный id диалога' };
+        }
+
+        try {
+            const checkSnap = await this.checkDialog(requester, convId);
+
+            if (checkSnap.error) return {...checkSnap}
+
+            let dialog
+
+            if (checkSnap === 'PersonalConversation') {
+                const temp = await this.getPersonalConversations(requester, undefined, 1, 1, convId)
+                dialog = temp.personal[0] || {}
+            } else if (checkSnap === 'GroupConversation') {
+                const temp = await this.getGroupConversations(requester, undefined, 1, 1, convId)
+                dialog = temp.groups[0] || {}
+            }
+
+            return {dialog}
+
+        } catch (err) {
+            console.error("Ошибка при получении диалога пользователя:", err.message);
+            throw new Error("Ошибка при получении диалога пользователя");
+        }
+    }
+
 }
 
 module.exports = new smService();

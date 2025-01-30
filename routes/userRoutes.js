@@ -65,6 +65,7 @@ router.get('/group/check', authMiddleware, cmController.checkGroup);
 router.post('/group', authMiddleware, cmController.createGroup);
 
 router.get('/conv', authMiddleware, cmController.getConversations);
+router.get('/conv/:id', authMiddleware, cmController.getConversationInfo);
 
 
 module.exports = router;
