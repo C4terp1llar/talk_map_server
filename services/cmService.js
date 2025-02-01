@@ -703,43 +703,24 @@ class smService {
                         isDeleted: false,
                     }
                 },
-                // инф о читателях сообщения
-                {
-                    $lookup: {
-                        from: "users",
-                        localField: "isRead.user_id",
-                        foreignField: "_id",
-                        as: "readersInfo",
-                    }
-                },
-                {
-                    $lookup: {
-                        from: "avatars",
-                        localField: "readersInfo._id",
-                        foreignField: "user_id",
-                        as: "readerAvatars",
-                    }
-                },
                 {
                     $addFields: {
-                        readers: {
-                            $map: {
-                                input: "$isRead",
-                                as: "readEntry",
-                                in: {
-                                    user_id: "$$readEntry.user_id",
-                                    read: "$$readEntry.read",
-                                    userInfo: {
-                                        nickname: { $arrayElemAt: ["$readersInfo.nickname", 0] },
-                                        nickname_color: { $arrayElemAt: ["$readersInfo.nickname_color", 0] },
-                                        avatar: { $arrayElemAt: ["$readerAvatars.asset_url", 0] },
+                        isRead: {
+                            $gt: [
+                                {
+                                    $size: {
+                                        $filter: {
+                                            input: "$isRead",
+                                            as: "readEntry",
+                                            cond: { $eq: ["$$readEntry.read", true] }
+                                        }
                                     }
-                                }
-                            }
-                        },
+                                },
+                                1
+                            ]
+                        }
                     }
                 },
-                // инф  о отправителе и сообщении
                 {
                     $lookup: {
                         from: "users",
@@ -811,27 +792,7 @@ class smService {
                         sender: 1,
                         mode: 1,
                         mediaInfo: 1,
-                        readers: 1
-                    }
-                },
-                {
-                    $group: {
-                        _id: "$_id",
-                        conversation_id: { $first: "$conversation_id" },
-                        conversationType: { $first: "$conversationType" },
-                        content: { $first: "$content" },
-                        replyTo: { $first: "$replyTo" },
-                        messageType: { $first: "$messageType" },
-                        additionalInfo: { $first: "$additionalInfo" },
-                        isEdited: { $first: "$isEdited" },
-                        isDeleted: { $first: "$isDeleted" },
-                        isForwarded: { $first: "$isForwarded" },
-                        updatedAt: { $first: "$updatedAt" },
-                        createdAt: { $first: "$createdAt" },
-                        sender: { $first: "$sender" },
-                        mode: { $first: "$mode" },
-                        mediaInfo: { $first: "$mediaInfo" },
-                        readers: { $first: "$readers" }
+                        isRead: 1
                     }
                 },
                 { $sort: { createdAt: 1 } },
@@ -847,6 +808,7 @@ class smService {
             throw new Error("Ошибка при получении сообщений из диалога");
         }
     }
+
 
 
     async getUserDialog(requester, convId) {
