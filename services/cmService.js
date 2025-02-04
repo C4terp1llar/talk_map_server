@@ -282,27 +282,16 @@ class smService {
                                 },
                             },
                             {
-                                $addFields: {
-                                    unreadCount: {
-                                        $size: {
-                                            $filter: {
-                                                input: "$isRead",
-                                                as: "readInfo",
-                                                cond: {
-                                                    $and: [
-                                                        { $eq: ["$$readInfo.user_id", new mongoose.Types.ObjectId(requester)] },
-                                                        { $eq: ["$$readInfo.read", false] },
-                                                    ],
-                                                },
-                                            },
-                                        },
-                                    },
-                                },
+                                $unwind: "$isRead"
                             },
                             {
                                 $match: {
-                                    unreadCount: { $gt: 0 },
+                                    "isRead.read": false,
+                                    "isRead.user_id": new mongoose.Types.ObjectId(requester),
                                 },
+                            },
+                            {
+                                $count: "totalUnread",
                             },
                         ],
                         as: "unreadMessages",
@@ -408,7 +397,11 @@ class smService {
                             },
                         },
                         unreadMessagesCount: {
-                            $ifNull: [{$arrayElemAt: ["$unreadMessages.unreadCount", 0]}, 0],
+                            $cond: {
+                                if: { $gt: [{ $size: "$unreadMessages" }, 0] },
+                                then: { $arrayElemAt: ["$unreadMessages.totalUnread", 0] },
+                                else: 0
+                            },
                         },
                     },
                 },
