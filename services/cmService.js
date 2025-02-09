@@ -2,6 +2,7 @@ const personalConv = require("../models/personalConvModel");
 const groupConv = require("../models/groupConvModel");
 const Message = require("../models/messageModel");
 const User = require("../models/userModel");
+const Friend = require("../models/friendModel");
 
 const MediaService = require("./mediaService");
 const generateBase64Cover = require("../utils/generateCover");
@@ -450,6 +451,11 @@ class smService {
                 this.getGroupConversations(requester, q, page, dialogLimit)
             ]);
 
+            let withoutConversations = null;
+            if (q && !groupConversations.hasMore && !personalConversations.hasMore) {
+                withoutConversations = await this.getFriendsWithoutConversation(requester, q, page, limit);
+            }
+
             const combinedConversations = [
                 ...personalConversations.personal,
                 ...groupConversations.groups
@@ -459,11 +465,118 @@ class smService {
 
             return {
                 conversations: combinedConversations,
-                hasMore: groupConversations.hasMore || personalConversations.hasMore,
+                withoutConversations: withoutConversations ? [...withoutConversations.friends] : null,
+                hasMore: groupConversations.hasMore || personalConversations.hasMore || (withoutConversations ? withoutConversations.hasMore : false),
             };
 
         } catch (err) {
             console.error("Ошибка при получении диалогов:", err);
+            throw err;
+        }
+    }
+
+    async getFriendsWithoutConversation(requester, q = "", page = 1, limit = 15) {
+        if (!mongoose.Types.ObjectId.isValid(requester)) {
+            throw new Error("Некорректный uid");
+        }
+
+        try {
+
+            const friendsWithoutDialogs = await Friend.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { user1_id: new mongoose.Types.ObjectId(requester) },
+                            { user2_id: new mongoose.Types.ObjectId(requester) }
+                        ]
+                    }
+                },
+                {
+                    $addFields: {
+                        friendId: {
+                            $cond: {
+                                if: { $eq: ["$user1_id", new mongoose.Types.ObjectId(requester)] },
+                                then: "$user2_id",
+                                else: "$user1_id"
+                            }
+                        }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "friendId",
+                        foreignField: "_id",
+                        as: "friendInfo"
+                    }
+                },
+                { $unwind: "$friendInfo" },
+                {
+                    $lookup: {
+                        from: "PersonalConversations",
+                        let: { friendId: "$friendInfo._id" },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $or: [
+                                            { $and: [{ $eq: ["$user1_id", new mongoose.Types.ObjectId(requester)] }, { $eq: ["$user2_id", "$$friendId"] }] },
+                                            { $and: [{ $eq: ["$user2_id", new mongoose.Types.ObjectId(requester)] }, { $eq: ["$user1_id", "$$friendId"] }] }
+                                        ]
+                                    }
+                                }
+                            }
+                        ],
+                        as: "existingDialog"
+                    }
+                },
+                {
+                    $match: {
+                        "existingDialog.0": { $exists: false } // Проверяем, что нет существующего диалога
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "avatars",
+                        localField: "friendInfo._id",
+                        foreignField: "user_id",
+                        as: "avatar"
+                    }
+                },
+                {
+                    $addFields: {
+                        avatar: { $arrayElemAt: ["$avatar.asset_url", 0] }
+                    }
+                },
+                {
+                    $match: {
+                        "friendInfo.nickname": { $regex: new RegExp(q, "i") }
+                    }
+                },
+                { $sort: { createdAt: -1 } },
+                { $skip: (page - 1) * limit },
+                { $limit: limit + 1 },
+                {
+                    $project: {
+                        _id: "$friendInfo._id",
+                        nickname: "$friendInfo.nickname",
+                        nickname_color: "$friendInfo.nickname_color",
+                        avatar: 1
+                    }
+                }
+            ]);
+
+
+            const hasMore = friendsWithoutDialogs.length > limit;
+            if (hasMore) friendsWithoutDialogs.pop();
+
+            return {
+                friends: friendsWithoutDialogs,
+                hasMore
+            };
+
+        } catch (err) {
+            console.error("Ошибка при пользователей без диалога:", err);
             throw err;
         }
     }
