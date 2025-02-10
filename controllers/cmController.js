@@ -124,6 +124,27 @@ class cmController {
       return res.status(500).json({ error: "Ошибка при получении диалога" });
     }
   }
+
+  async getNewConvOpponent(req, res) {
+    const { uid } = req.params;
+
+    if (!uid) return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+
+    try {
+      const requester = req.user.uid;
+
+      const user = await cmService.getNewUserWithoutDialog(requester, uid);
+
+      if (user.error && user.error === '400') {
+        return res.status(400).json({ error: "Данные о запрашиваемом оппоненте некорректны" });
+      }
+
+      res.status(200).json({user});
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Ошибка при пользователя для нового диалога" });
+    }
+  }
 }
 
 module.exports = new cmController();

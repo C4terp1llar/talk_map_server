@@ -945,6 +945,102 @@ class smService {
         }
     }
 
+    async getNewUserWithoutDialog(requester, targetUid) {
+        if (!mongoose.Types.ObjectId.isValid(requester) || !mongoose.Types.ObjectId.isValid(targetUid)) {
+            return { error: '400', message: 'Некорректные id' };
+        }
+
+        try {
+
+            const friend = await Friend.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { user1_id: new mongoose.Types.ObjectId(requester), user2_id: new mongoose.Types.ObjectId(targetUid) },
+                            { user1_id: new mongoose.Types.ObjectId(targetUid), user2_id: new mongoose.Types.ObjectId(requester) }
+                        ]
+                    }
+                },
+                {
+                    $addFields: {
+                        friendId: {
+                            $cond: {
+                                if: { $eq: ["$user1_id", new mongoose.Types.ObjectId(requester)] },
+                                then: "$user2_id",
+                                else: "$user1_id"
+                            }
+                        }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "PersonalConversations",
+                        let: { requesterId: new mongoose.Types.ObjectId(requester), friendId: "$friendId" },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $or: [
+                                            { $and: [{ $eq: ["$user1_id", "$$requesterId"] }, { $eq: ["$user2_id", "$$friendId"] }] },
+                                            { $and: [{ $eq: ["$user1_id", "$$friendId"] }, { $eq: ["$user2_id", "$$requesterId"] }] }
+                                        ]
+                                    }
+                                }
+                            }
+                        ],
+                        as: "existingDialog"
+                    }
+                },
+                {
+                    $match: {
+                        existingDialog: { $size: 0 }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "friendId",
+                        foreignField: "_id",
+                        as: "friendInfo"
+                    }
+                },
+                { $unwind: "$friendInfo" },
+                {
+                    $lookup: {
+                        from: "avatars",
+                        localField: "friendId",
+                        foreignField: "user_id",
+                        as: "avatar"
+                    }
+                },
+                {
+                    $addFields: {
+                        avatar: { $arrayElemAt: ["$avatar.asset_url", 0] }
+                    }
+                },
+                {
+                    $project: {
+                        _id: "$friendInfo._id",
+                        nickname: "$friendInfo.nickname",
+                        nickname_color: "$friendInfo.nickname_color",
+                        avatar: 1
+                    }
+                }
+            ]);
+
+            if (!friend.length) {
+                return { error: "400", message: "Пользователь не найден или уже есть диалог" };
+            }
+
+            return friend[0];
+
+        } catch (err) {
+            console.error("Ошибка при получении пользователя для нового диалога:", err.message);
+            throw new Error("Ошибка при получении пользователя для нового диалога");
+        }
+    }
+
+
 }
 
 module.exports = new smService();
