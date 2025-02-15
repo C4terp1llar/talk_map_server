@@ -98,7 +98,7 @@ class MediaService {
         }
     }
 
-    async createMedia(user_id, client_filename, client_file_type, client_file_size, store_filename, store_url) {
+    async createMedia(user_id, client_filename, client_file_type, client_file_size, store_filename, store_url, conversation_id, conversation_model) {
         try {
             const media = new Media({
                 user_id,
@@ -106,7 +106,9 @@ class MediaService {
                 client_file_type,
                 client_file_size,
                 store_filename,
-                store_url
+                store_url,
+                conversation_id: conversation_id || null,
+                conversation_model: conversation_model || null
             });
             return await media.save();
         } catch (err) {

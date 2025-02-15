@@ -6,6 +6,16 @@ const MediaSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
+    conversation_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        refPath: 'conversation_model',
+        default: null,
+    },
+    conversation_model: {
+        type: String,
+        enum: ['GroupConversation', 'PersonalConversation'],
+        default: null,
+    },
     client_filename: {
         type: String,
         required: true,
@@ -31,6 +41,8 @@ const MediaSchema = new mongoose.Schema({
         default: Date.now,
     },
 });
+
+MediaSchema.index({ conversation_id: 1 });
 
 const Media = mongoose.model('Media', MediaSchema);
 

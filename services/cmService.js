@@ -11,7 +11,7 @@ const uploadMedia = require('../utils/uploadMedia');
 
 class smService {
 
-    async getPersonalConversations(requester, q = "", page = 1, limit = 30, byId) {
+    async getPersonalConversations(requester, q = "", page = 1, limit = 30, byId, withoutMInfo = false) {
         if (!mongoose.Types.ObjectId.isValid(requester)) {
             throw new Error("Некорректный uid");
         }
@@ -24,7 +24,7 @@ class smService {
                 ],
             };
 
-            if (byId){
+            if (byId) {
                 matchCase = {
                     _id: new mongoose.Types.ObjectId(byId),
                 };
@@ -91,14 +91,14 @@ class smService {
                 {
                     $lookup: {
                         from: "messages",
-                        let: { convId: "$_id" },
+                        let: {convId: "$_id"},
                         pipeline: [
                             {
                                 $match: {
                                     $expr: {
                                         $and: [
-                                            { $eq: ["$conversation_id", "$$convId"] },
-                                            { $eq: ["$conversationType", "PersonalConversation"] },
+                                            {$eq: ["$conversation_id", "$$convId"]},
+                                            {$eq: ["$conversationType", "PersonalConversation"]},
                                             {
                                                 $not: {
                                                     $anyElementTrue: {
@@ -107,8 +107,8 @@ class smService {
                                                             as: "readInfo",
                                                             in: {
                                                                 $and: [
-                                                                    { $eq: ["$$readInfo.user_id", new mongoose.Types.ObjectId(requester)] },
-                                                                    { $eq: ["$$readInfo.read", true] },
+                                                                    {$eq: ["$$readInfo.user_id", new mongoose.Types.ObjectId(requester)]},
+                                                                    {$eq: ["$$readInfo.read", true]},
                                                                 ],
                                                             },
                                                         },
@@ -119,7 +119,7 @@ class smService {
                                     },
                                 },
                             },
-                            { $count: "unreadCount" },
+                            {$count: "unreadCount"},
                         ],
                         as: "unreadMessages",
                     },
@@ -248,7 +248,7 @@ class smService {
                 "members.user_id": new mongoose.Types.ObjectId(requester),
             };
 
-            if (byId){
+            if (byId) {
                 matchCase = {
                     _id: new mongoose.Types.ObjectId(byId),
                 };
@@ -273,7 +273,7 @@ class smService {
                 {
                     $lookup: {
                         from: "messages",
-                        let: { convId: "$_id" },
+                        let: {convId: "$_id"},
                         pipeline: [
                             {
                                 $match: {
@@ -399,8 +399,8 @@ class smService {
                         },
                         unreadMessagesCount: {
                             $cond: {
-                                if: { $gt: [{ $size: "$unreadMessages" }, 0] },
-                                then: { $arrayElemAt: ["$unreadMessages.totalUnread", 0] },
+                                if: {$gt: [{$size: "$unreadMessages"}, 0]},
+                                then: {$arrayElemAt: ["$unreadMessages.totalUnread", 0]},
                                 else: 0
                             },
                         },
@@ -486,8 +486,8 @@ class smService {
                 {
                     $match: {
                         $or: [
-                            { user1_id: new mongoose.Types.ObjectId(requester) },
-                            { user2_id: new mongoose.Types.ObjectId(requester) }
+                            {user1_id: new mongoose.Types.ObjectId(requester)},
+                            {user2_id: new mongoose.Types.ObjectId(requester)}
                         ]
                     }
                 },
@@ -495,7 +495,7 @@ class smService {
                     $addFields: {
                         friendId: {
                             $cond: {
-                                if: { $eq: ["$user1_id", new mongoose.Types.ObjectId(requester)] },
+                                if: {$eq: ["$user1_id", new mongoose.Types.ObjectId(requester)]},
                                 then: "$user2_id",
                                 else: "$user1_id"
                             }
@@ -510,18 +510,18 @@ class smService {
                         as: "friendInfo"
                     }
                 },
-                { $unwind: "$friendInfo" },
+                {$unwind: "$friendInfo"},
                 {
                     $lookup: {
                         from: "PersonalConversations",
-                        let: { friendId: "$friendInfo._id" },
+                        let: {friendId: "$friendInfo._id"},
                         pipeline: [
                             {
                                 $match: {
                                     $expr: {
                                         $or: [
-                                            { $and: [{ $eq: ["$user1_id", new mongoose.Types.ObjectId(requester)] }, { $eq: ["$user2_id", "$$friendId"] }] },
-                                            { $and: [{ $eq: ["$user2_id", new mongoose.Types.ObjectId(requester)] }, { $eq: ["$user1_id", "$$friendId"] }] }
+                                            {$and: [{$eq: ["$user1_id", new mongoose.Types.ObjectId(requester)]}, {$eq: ["$user2_id", "$$friendId"]}]},
+                                            {$and: [{$eq: ["$user2_id", new mongoose.Types.ObjectId(requester)]}, {$eq: ["$user1_id", "$$friendId"]}]}
                                         ]
                                     }
                                 }
@@ -532,7 +532,7 @@ class smService {
                 },
                 {
                     $match: {
-                        "existingDialog.0": { $exists: false } // Проверяем, что нет существующего диалога
+                        "existingDialog.0": {$exists: false} // Проверяем, что нет существующего диалога
                     }
                 },
                 {
@@ -545,17 +545,17 @@ class smService {
                 },
                 {
                     $addFields: {
-                        avatar: { $arrayElemAt: ["$avatar.asset_url", 0] }
+                        avatar: {$arrayElemAt: ["$avatar.asset_url", 0]}
                     }
                 },
                 {
                     $match: {
-                        "friendInfo.nickname": { $regex: new RegExp(q, "i") }
+                        "friendInfo.nickname": {$regex: new RegExp(q, "i")}
                     }
                 },
-                { $sort: { createdAt: -1 } },
-                { $skip: (page - 1) * limit },
-                { $limit: limit + 1 },
+                {$sort: {createdAt: -1}},
+                {$skip: (page - 1) * limit},
+                {$limit: limit + 1},
                 {
                     $project: {
                         _id: "$friendInfo._id",
@@ -581,7 +581,7 @@ class smService {
         }
     }
 
-    async createMessage(from, to, content, files, conversationId = null, replyTo = null, chatType, msgType = "default", addInfo = null ) {
+    async createMessage(from, to, content, files, conversationId = null, replyTo = null, chatType, msgType = "default", addInfo = null) {
         if (!content && !files) {
             throw new Error("Сообщение не может быть пустым");
         }
@@ -645,7 +645,7 @@ class smService {
             let media = [];
             if (files) {
                 try {
-                    media = await uploadMedia(from, files);
+                    media = await uploadMedia(from, files, conversation._id, chatType === "personal" ? "PersonalConversation" : "GroupConversation");
                 } catch (uploadError) {
                     throw uploadError;
                 }
@@ -753,7 +753,7 @@ class smService {
             await this.createMessage(
                 requester, undefined, "create_group", undefined, newGroup._id, undefined, "group",
                 "system", `group_title:${title}`,
-                );
+            );
 
             return newGroup;
         } catch (err) {
@@ -770,7 +770,7 @@ class smService {
             ]);
 
             if (!p && !g) {
-                return { error: '400', message: 'Диалог с таким id несуществует' };
+                return {error: '400', message: 'Диалог с таким id несуществует'};
             }
 
             let isParticipant = false;
@@ -782,7 +782,7 @@ class smService {
             }
 
             if (!isParticipant) {
-                return { error: '400', message: 'Пользователь не является участником запрашиваемого диалога' };
+                return {error: '400', message: 'Пользователь не является участником запрашиваемого диалога'};
             }
 
             return p ? "PersonalConversation" : "GroupConversation"
@@ -794,12 +794,12 @@ class smService {
 
     async getMessages(requester, convId, page = 1, limit = 200) {
         if (!mongoose.Types.ObjectId.isValid(requester) || !mongoose.Types.ObjectId.isValid(convId)) {
-            return { error: '400', message: 'Некорректный id диалога' };
+            return {error: '400', message: 'Некорректный id диалога'};
         }
 
         try {
             const checkSnap = await this.checkDialog(requester, convId);
-            if (checkSnap.error) return { ...checkSnap };
+            if (checkSnap.error) return {...checkSnap};
 
             const messages = await Message.aggregate([
                 {
@@ -818,7 +818,7 @@ class smService {
                                         $filter: {
                                             input: "$isRead",
                                             as: "readEntry",
-                                            cond: { $eq: ["$$readEntry.read", true] }
+                                            cond: {$eq: ["$$readEntry.read", true]}
                                         }
                                     }
                                 },
@@ -855,13 +855,13 @@ class smService {
                     $addFields: {
                         sender: {
                             _id: "$user_id",
-                            nickname: { $arrayElemAt: ["$senderInfo.nickname", 0] },
-                            nickname_color: { $arrayElemAt: ["$senderInfo.nickname_color", 0] },
-                            avatar: { $arrayElemAt: ["$senderAvatarInfo.asset_url", 0] },
+                            nickname: {$arrayElemAt: ["$senderInfo.nickname", 0]},
+                            nickname_color: {$arrayElemAt: ["$senderInfo.nickname_color", 0]},
+                            avatar: {$arrayElemAt: ["$senderAvatarInfo.asset_url", 0]},
                         },
                         mode: {
                             $cond: {
-                                if: { $eq: ["$user_id", new mongoose.Types.ObjectId(requester)] },
+                                if: {$eq: ["$user_id", new mongoose.Types.ObjectId(requester)]},
                                 then: "internal",
                                 else: "external",
                             },
@@ -901,14 +901,14 @@ class smService {
                         isRead: 1
                     }
                 },
-                { $sort: { createdAt: 1 } },
-                { $skip: (page - 1) * limit },
-                { $limit: limit }
+                {$sort: {createdAt: 1}},
+                {$skip: (page - 1) * limit},
+                {$limit: limit}
             ]);
 
             const hasMore = messages.length === limit;
 
-            return { messages, hasMore };
+            return {messages, hasMore};
         } catch (err) {
             console.error("Ошибка при получении сообщений из диалога:", err.message);
             throw new Error("Ошибка при получении сообщений из диалога");
@@ -916,10 +916,9 @@ class smService {
     }
 
 
-
     async getUserDialog(requester, convId) {
         if (!mongoose.Types.ObjectId.isValid(requester) || !mongoose.Types.ObjectId.isValid(convId)) {
-            return { error: '400', message: 'Некорректный id диалога' };
+            return {error: '400', message: 'Некорректный id диалога'};
         }
 
         try {
@@ -947,7 +946,7 @@ class smService {
 
     async getNewUserWithoutDialog(requester, targetUid) {
         if (!mongoose.Types.ObjectId.isValid(requester) || !mongoose.Types.ObjectId.isValid(targetUid)) {
-            return { error: '400', message: 'Некорректные id' };
+            return {error: '400', message: 'Некорректные id'};
         }
 
         try {
@@ -956,8 +955,14 @@ class smService {
                 {
                     $match: {
                         $or: [
-                            { user1_id: new mongoose.Types.ObjectId(requester), user2_id: new mongoose.Types.ObjectId(targetUid) },
-                            { user1_id: new mongoose.Types.ObjectId(targetUid), user2_id: new mongoose.Types.ObjectId(requester) }
+                            {
+                                user1_id: new mongoose.Types.ObjectId(requester),
+                                user2_id: new mongoose.Types.ObjectId(targetUid)
+                            },
+                            {
+                                user1_id: new mongoose.Types.ObjectId(targetUid),
+                                user2_id: new mongoose.Types.ObjectId(requester)
+                            }
                         ]
                     }
                 },
@@ -965,7 +970,7 @@ class smService {
                     $addFields: {
                         friendId: {
                             $cond: {
-                                if: { $eq: ["$user1_id", new mongoose.Types.ObjectId(requester)] },
+                                if: {$eq: ["$user1_id", new mongoose.Types.ObjectId(requester)]},
                                 then: "$user2_id",
                                 else: "$user1_id"
                             }
@@ -975,14 +980,14 @@ class smService {
                 {
                     $lookup: {
                         from: "PersonalConversations",
-                        let: { requesterId: new mongoose.Types.ObjectId(requester), friendId: "$friendId" },
+                        let: {requesterId: new mongoose.Types.ObjectId(requester), friendId: "$friendId"},
                         pipeline: [
                             {
                                 $match: {
                                     $expr: {
                                         $or: [
-                                            { $and: [{ $eq: ["$user1_id", "$$requesterId"] }, { $eq: ["$user2_id", "$$friendId"] }] },
-                                            { $and: [{ $eq: ["$user1_id", "$$friendId"] }, { $eq: ["$user2_id", "$$requesterId"] }] }
+                                            {$and: [{$eq: ["$user1_id", "$$requesterId"]}, {$eq: ["$user2_id", "$$friendId"]}]},
+                                            {$and: [{$eq: ["$user1_id", "$$friendId"]}, {$eq: ["$user2_id", "$$requesterId"]}]}
                                         ]
                                     }
                                 }
@@ -993,7 +998,7 @@ class smService {
                 },
                 {
                     $match: {
-                        existingDialog: { $size: 0 }
+                        existingDialog: {$size: 0}
                     }
                 },
                 {
@@ -1004,7 +1009,7 @@ class smService {
                         as: "friendInfo"
                     }
                 },
-                { $unwind: "$friendInfo" },
+                {$unwind: "$friendInfo"},
                 {
                     $lookup: {
                         from: "avatars",
@@ -1015,7 +1020,7 @@ class smService {
                 },
                 {
                     $addFields: {
-                        avatar: { $arrayElemAt: ["$avatar.asset_url", 0] }
+                        avatar: {$arrayElemAt: ["$avatar.asset_url", 0]}
                     }
                 },
                 {
@@ -1029,7 +1034,7 @@ class smService {
             ]);
 
             if (!friend.length) {
-                return { error: "400", message: "Пользователь не найден или уже есть диалог" };
+                return {error: "400", message: "Пользователь не найден или уже есть диалог"};
             }
 
             return friend[0];
@@ -1040,6 +1045,86 @@ class smService {
         }
     }
 
+    async getConvMembers(requester, convId, page, limit) {
+        if (!mongoose.Types.ObjectId.isValid(requester) || !mongoose.Types.ObjectId.isValid(convId)) {
+            return {error: '400', status: 400, message: 'Некорректные id'};
+        }
+
+        try {
+
+            const isMember = await groupConv.exists({ _id: convId, "members.user_id": new mongoose.Types.ObjectId(requester) });
+            if (!isMember) {
+                return { error: '400', status: 400, message: 'Запрашивающий не состоите в группе' };
+            }
+
+            const [senderData, members] = await Promise.all([
+                groupConv.aggregate([
+                    { $match: { _id: new mongoose.Types.ObjectId(convId) } },
+                    { $unwind: "$members" },
+                    { $match: { "members.user_id": new mongoose.Types.ObjectId(requester) } },
+                    { $lookup: { from: "users", localField: "members.user_id", foreignField: "_id", as: "userInfo" } },
+                    { $unwind: "$userInfo" },
+                    { $lookup: { from: "avatars", localField: "members.user_id", foreignField: "user_id", as: "avatarInfo" } },
+                    { $unwind: { path: "$avatarInfo", preserveNullAndEmptyArrays: true } },
+                    {
+                        $project: {
+                            _id: "$userInfo._id",
+                            nickname: "$userInfo.nickname",
+                            nickname_color: "$userInfo.nickname_color",
+                            avatar: "$avatarInfo.asset_url",
+                            role: "$members.role"
+                        }
+                    }
+                ]),
+                groupConv.aggregate([
+                    { $match: { _id: new mongoose.Types.ObjectId(convId) } },
+                    { $unwind: "$members" },
+                    { $match: { "members.user_id": { $ne: new mongoose.Types.ObjectId(requester) } } },
+                    { $lookup: { from: "users", localField: "members.user_id", foreignField: "_id", as: "userInfo" } },
+                    { $unwind: "$userInfo" },
+                    { $lookup: { from: "avatars", localField: "members.user_id", foreignField: "user_id", as: "avatarInfo" } },
+                    { $unwind: { path: "$avatarInfo", preserveNullAndEmptyArrays: true } },
+                    {
+                        $project: {
+                            _id: "$userInfo._id",
+                            nickname: "$userInfo.nickname",
+                            nickname_color: "$userInfo.nickname_color",
+                            avatar: "$avatarInfo.asset_url",
+                            role: "$members.role"
+                        }
+                    },
+                    {
+                        $addFields: {
+                            sortOrder: {
+                                $switch: {
+                                    branches: [
+                                        { case: { $eq: ["$members.role", "owner"] }, then: 1 },
+                                        { case: { $eq: ["$members.role", "admin"] }, then: 2 },
+                                        { case: { $eq: ["$members.role", "member"] }, then: 3 }
+                                    ],
+                                    default: 4
+                                }
+                            }
+                        }
+                    },
+                    { $sort: { sortOrder: 1 } },
+                    { $skip: (page - 1) * limit },
+                    { $limit: limit + 1 },
+                    {$project: {sortOrder: 0}}
+                ])
+            ])
+
+            const sender = senderData[0] ?? null;
+
+            const hasMore = members.length > limit;
+            if (hasMore) members.pop();
+
+            return { members, hasMore, sender };
+        } catch (err) {
+            console.error("Ошибка при получении участников диалога:", err.message);
+            throw new Error("Ошибка при получении получении участников диалога");
+        }
+    }
 
 }
 

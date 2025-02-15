@@ -1,6 +1,6 @@
 const MediaService = require("../services/mediaService");
 
-async function uploadMedia(requester, files) {
+async function uploadMedia(requester, files, conversation_id, conversation_model) {
     const uploads = await Promise.all(
         Object.values(files).flat().map((file) => MediaService.uploadToS3(file, requester))
     );
@@ -13,7 +13,9 @@ async function uploadMedia(requester, files) {
                 upload.client_file_type,
                 upload.client_file_size,
                 upload.store_filename,
-                upload.store_url
+                upload.store_url,
+                conversation_id,
+                conversation_model
             )
         )
     );
