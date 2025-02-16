@@ -67,6 +67,8 @@ router.post('/group', authMiddleware, cmController.createGroup);
 router.get('/conv', authMiddleware, cmController.getConversations);
 router.get('/conv/:id', authMiddleware, cmController.getConversationInfo);
 router.get('/conv/:id/members', authMiddleware, cmController.getGroupConvMembers);
+router.delete('/conv/:id/members/:targetUid', authMiddleware, cmController.kickGroupMember);
+router.patch('/conv/:id/members/role', authMiddleware, cmController.updateMemberGroupRole);
 
 router.get('/conv/new/:uid', authMiddleware, cmController.getNewConvOpponent);
 

@@ -170,6 +170,45 @@ class cmController {
         }
     }
 
+    async updateMemberGroupRole(req, res) {
+        const { id: convId } = req.params;
+        const { targetMember, role } = req.body;
+
+        if (!convId || !targetMember || !role || !["admin", "owner", "member"].includes(role)) return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+
+        try {
+            const result = await cmService.changeConvMemberRole(req.user.uid, targetMember, convId, role);
+
+            if (result.error) {
+                return res.status(result.status).json({ error: result.message });
+            }
+
+            return res.status(200).json({ message: result.message, newRole: result.newRole });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при изменении роли участника группы" });
+        }
+    }
+
+    async kickGroupMember(req, res) {
+        const { id: convId, targetUid } = req.params;
+
+        if (!convId || !targetUid) return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+
+        try {
+            const result = await cmService.kickGroupMember(req.user.uid, targetUid, convId);
+
+            if (result.error) {
+                return res.status(result.status).json({ error: result.message });
+            }
+
+            return res.status(200).json({ message: result.message });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при исключении участника из группы" });
+        }
+    }
+
     async getConvImages(req, res) {
         const {convId, page = 1, limit = 50} = req.query;
 

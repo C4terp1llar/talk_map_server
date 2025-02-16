@@ -8,6 +8,9 @@ const MediaService = require("./mediaService");
 const generateBase64Cover = require("../utils/generateCover");
 const mongoose = require("mongoose");
 const uploadMedia = require('../utils/uploadMedia');
+const asyncTaskRunner = require('../utils/asyncTaskRunner')
+const wsServer = require("../utils/wsServer");
+const {promise} = require("bcrypt/promises");
 
 class smService {
 
@@ -1052,20 +1055,30 @@ class smService {
 
         try {
 
-            const isMember = await groupConv.exists({ _id: convId, "members.user_id": new mongoose.Types.ObjectId(requester) });
+            const isMember = await groupConv.exists({
+                _id: convId,
+                "members.user_id": new mongoose.Types.ObjectId(requester)
+            });
             if (!isMember) {
-                return { error: '400', status: 400, message: 'Запрашивающий не состоите в группе' };
+                return {error: '400', status: 400, message: 'Запрашивающий не состоите в группе'};
             }
 
             const [senderData, members] = await Promise.all([
                 groupConv.aggregate([
-                    { $match: { _id: new mongoose.Types.ObjectId(convId) } },
-                    { $unwind: "$members" },
-                    { $match: { "members.user_id": new mongoose.Types.ObjectId(requester) } },
-                    { $lookup: { from: "users", localField: "members.user_id", foreignField: "_id", as: "userInfo" } },
-                    { $unwind: "$userInfo" },
-                    { $lookup: { from: "avatars", localField: "members.user_id", foreignField: "user_id", as: "avatarInfo" } },
-                    { $unwind: { path: "$avatarInfo", preserveNullAndEmptyArrays: true } },
+                    {$match: {_id: new mongoose.Types.ObjectId(convId)}},
+                    {$unwind: "$members"},
+                    {$match: {"members.user_id": new mongoose.Types.ObjectId(requester)}},
+                    {$lookup: {from: "users", localField: "members.user_id", foreignField: "_id", as: "userInfo"}},
+                    {$unwind: "$userInfo"},
+                    {
+                        $lookup: {
+                            from: "avatars",
+                            localField: "members.user_id",
+                            foreignField: "user_id",
+                            as: "avatarInfo"
+                        }
+                    },
+                    {$unwind: {path: "$avatarInfo", preserveNullAndEmptyArrays: true}},
                     {
                         $project: {
                             _id: "$userInfo._id",
@@ -1082,17 +1095,15 @@ class smService {
                     { $match: { "members.user_id": { $ne: new mongoose.Types.ObjectId(requester) } } },
                     { $lookup: { from: "users", localField: "members.user_id", foreignField: "_id", as: "userInfo" } },
                     { $unwind: "$userInfo" },
-                    { $lookup: { from: "avatars", localField: "members.user_id", foreignField: "user_id", as: "avatarInfo" } },
-                    { $unwind: { path: "$avatarInfo", preserveNullAndEmptyArrays: true } },
                     {
-                        $project: {
-                            _id: "$userInfo._id",
-                            nickname: "$userInfo.nickname",
-                            nickname_color: "$userInfo.nickname_color",
-                            avatar: "$avatarInfo.asset_url",
-                            role: "$members.role"
+                        $lookup: {
+                            from: "avatars",
+                            localField: "members.user_id",
+                            foreignField: "user_id",
+                            as: "avatarInfo"
                         }
                     },
+                    { $unwind: { path: "$avatarInfo", preserveNullAndEmptyArrays: true } },
                     {
                         $addFields: {
                             sortOrder: {
@@ -1107,10 +1118,20 @@ class smService {
                             }
                         }
                     },
+                    {
+                        $project: {
+                            _id: "$userInfo._id",
+                            nickname: "$userInfo.nickname",
+                            nickname_color: "$userInfo.nickname_color",
+                            avatar: "$avatarInfo.asset_url",
+                            role: "$members.role",
+                            sortOrder: 1
+                        }
+                    },
                     { $sort: { sortOrder: 1 } },
                     { $skip: (page - 1) * limit },
                     { $limit: limit + 1 },
-                    {$project: {sortOrder: 0}}
+                    { $project: { sortOrder: 0 } }
                 ])
             ])
 
@@ -1119,12 +1140,125 @@ class smService {
             const hasMore = members.length > limit;
             if (hasMore) members.pop();
 
-            return { members, hasMore, sender };
+            return {members, hasMore, sender};
         } catch (err) {
             console.error("Ошибка при получении участников диалога:", err.message);
             throw new Error("Ошибка при получении получении участников диалога");
         }
     }
+
+    checkIds(...ids) {
+        if (ids.some(id => !mongoose.Types.ObjectId.isValid(id))) {
+            return { error: '400', status: 400, message: 'Некорректные id' };
+        }
+        return null;
+    }
+
+    async getConversationWithMembers(convId) {
+        const conversation = await groupConv.findById(convId);
+        if (!conversation) {
+            return { error: '404', status: 404, message: 'Группа не найдена' };
+        }
+        return conversation;
+    }
+
+    getMemberInfo(conversation, userId) {
+        return conversation.members.find(m => m.user_id.equals(new mongoose.Types.ObjectId(userId)));
+    }
+
+    async changeConvMemberRole(requester, targetMember, convId, newRole) {
+        const invalidIds = this.checkIds(requester, targetMember, convId);
+        if (invalidIds) return invalidIds;
+
+        try {
+            const conversation = await this.getConversationWithMembers(convId);
+            if (conversation.error) return conversation;
+
+            const requesterMember = this.getMemberInfo(conversation, requester);
+            const targetMemberData = this.getMemberInfo(conversation, targetMember);
+
+            if (!requesterMember) return { error: '400', status: 400, message: 'Вы не состоите в группе' };
+            if (!targetMemberData) return { error: '404', status: 404, message: 'Целевой пользователь не найден в группе' };
+
+            if (requesterMember.role !== "owner" && requesterMember.role !== "admin") {
+                return { error: '400', status: 400, message: 'Нет прав для изменения ролей' };
+            }
+            if (targetMemberData.role === "owner") {
+                return { error: '400', status: 400, message: 'Нельзя изменить роль владельца группы' };
+            }
+            if (requesterMember.role === "admin" && (targetMemberData.role === "admin" || newRole === "owner")) {
+                return { error: '400', status: 400, message: 'Админ не может изменять роль другого админа или назначать владельца' };
+            }
+
+            await groupConv.updateOne(
+                { _id: convId, "members.user_id": new mongoose.Types.ObjectId(targetMember) },
+                { $set: { "members.$.role": newRole } }
+            );
+
+            const [senderNick, recipientNick] = await Promise.all([
+                User.findById(requester).select('nickname').lean(),
+                User.findById(targetMember).select('nickname').lean()
+            ]);
+
+            await this.createMessage(requester, undefined, "change_role", undefined, convId, undefined,
+                'group', 'system', `sender:${senderNick.nickname};recipient:${recipientNick.nickname};newRole:${newRole}`);
+
+            return { newRole, status: 200, message: `Роль пользователя успешно изменена на ${newRole}` };
+        } catch (err) {
+            console.error("Ошибка при изменении роли пользователя:", err.message);
+            throw new Error("Ошибка при изменении роли пользователя");
+        }
+    }
+
+    async kickGroupMember(requester, target, convId) {
+        const invalidIds = this.checkIds(requester, target, convId);
+        if (invalidIds) return invalidIds;
+
+        try {
+            const conversation = await this.getConversationWithMembers(convId);
+            if (conversation.error) return conversation;
+
+            const requesterMember = this.getMemberInfo(conversation, requester);
+            const targetMemberData = this.getMemberInfo(conversation, target);
+
+            if (!requesterMember) return { error: '400', status: 400, message: 'Вы не состоите в группе' };
+            if (!targetMemberData) return { error: '404', status: 404, message: 'Целевой пользователь не найден в группе' };
+
+            if (targetMemberData.role === "owner") {
+                return { error: '400', status: 400, message: 'Нельзя исключить владельца группы' };
+            }
+
+            if (requesterMember.role === "member") {
+                return { error: '403', status: 403, message: 'Нет прав для исключения участников' };
+            }
+
+            if (requesterMember.role === "admin" && targetMemberData.role !== "member") {
+                return { error: '403', status: 403, message: 'Админ не может исключить другого админа' };
+            }
+
+            await groupConv.updateOne(
+                { _id: convId },
+                { $pull: { members: { user_id: new mongoose.Types.ObjectId(target) } } }
+            );
+
+            const [senderNick, recipientNick] = await Promise.all([
+                User.findById(requester).select('nickname').lean(),
+                User.findById(target).select('nickname').lean()
+            ]);
+
+            await this.createMessage(
+                requester, undefined, "kick_member", undefined, convId, undefined, 'group',
+                'system', `sender:${senderNick.nickname};recipient:${recipientNick.nickname}`
+            );
+
+            return { status: 200, message: `Пользователь успешно исключен из группы` };
+        } catch (err) {
+            console.error("Ошибка при исключении пользователя из группы:", err.message);
+            throw new Error("Ошибка при исключении пользователя из группы");
+        }
+    }
+
+
 
 }
 
