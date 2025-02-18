@@ -209,42 +209,44 @@ class cmController {
         }
     }
 
-    async getConvImages(req, res) {
-        const {convId, page = 1, limit = 50} = req.query;
+    async leaveGroupConv(req, res) {
+        const { id: convId } = req.params;
 
-        if (!convId) return res.status(400).json({error: "Нехватает данных или данные некорректны"});
+        if (!convId) return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
 
         try {
+            const result = await cmService.leaveGroup(req.user.uid, convId);
 
+            if (result.error) {
+                return res.status(result.status).json({ error: result.message });
+            }
+
+            return res.status(200).json({ message: result.message });
         } catch (err) {
             console.error(err);
-            return res.status(500).json({error: "Ошибка при получении всех фото из диалога"});
+            return res.status(500).json({ error: "Ошибка при исключении участника из группы" });
         }
     }
 
-    async getConvVideos(req, res) {
-        const {convId} = req.params;
+    async getConvMedia(req, res) {
+        const { id: convId } = req.params;
+        const { mode, page = 1, limit = 50 } = req.query;
 
-        if (!convId) return res.status(400).json({error: "Нехватает данных или данные некорректны"});
-
-        try {
-
-        } catch (err) {
-            console.error(err);
-            return res.status(500).json({error: "Ошибка при получении всех видео из диалога"});
+        if (!convId || !['image', 'video', 'files'].includes(mode)) {
+            return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
         }
-    }
-
-    async getConvFiles(req, res) {
-        const {convId} = req.params;
-
-        if (!convId) return res.status(400).json({error: "Нехватает данных или данные некорректны"});
 
         try {
+            const media = await cmService.getConversationMedia(req.user.uid, convId, mode, +page, +limit);
 
+            if (media.error) {
+                return res.status(400).json(media);
+            }
+
+            return res.status(200).json(media);
         } catch (err) {
-            console.error(err);
-            return res.status(500).json({error: "Ошибка при получении всех файлов из диалога"});
+            console.error("Ошибка при получении медиа из диалога:", err);
+            return res.status(500).json({ error: "Ошибка при получении медиа из диалога" });
         }
     }
 

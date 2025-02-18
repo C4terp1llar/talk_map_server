@@ -11,6 +11,7 @@ const uploadMedia = require('../utils/uploadMedia');
 const asyncTaskRunner = require('../utils/asyncTaskRunner')
 const wsServer = require("../utils/wsServer");
 const {promise} = require("bcrypt/promises");
+const Media = require("../models/mediaModel");
 
 class smService {
 
@@ -1257,6 +1258,153 @@ class smService {
             throw new Error("Ошибка при исключении пользователя из группы");
         }
     }
+
+    async leaveGroup(userId, convId) {
+        const invalidIds = this.checkIds(userId, convId);
+        if (invalidIds) return invalidIds;
+
+        try {
+            const conversation = await this.getConversationWithMembers(convId);
+            if (conversation.error) return conversation;
+
+            const userMember = this.getMemberInfo(conversation, userId);
+            if (!userMember) return { error: '400', status: 400, message: 'Вы не состоите в группе' };
+
+            // если юзер владелец, надо передать владельца
+            if (userMember.role === "owner") {
+                const admins = conversation.members.filter(m => m.role === "admin");
+                const members = conversation.members.filter(m => m.role === "member");
+
+                let newOwner = null;
+
+                if (admins.length > 0) {
+                    newOwner = admins.reduce((oldest, current) =>
+                        oldest.createdAt < current.createdAt ? oldest : current
+                    );
+                } else if (members.length > 0) {
+                    newOwner = members.reduce((oldest, current) =>
+                        oldest.createdAt < current.createdAt ? oldest : current
+                    );
+                }
+
+                if (newOwner) {
+                    await groupConv.updateOne(
+                        { _id: convId, "members.user_id": new mongoose.Types.ObjectId(newOwner.user_id) },
+                        { $set: { "members.$.role": "owner" } }
+                    );
+                }
+            }
+
+            // юзер последний в группе
+            if (conversation.members.length === 1) {
+                await Promise.all([
+                    groupConv.deleteOne({ _id: convId }),
+                    Message.deleteMany({ conversation_id: convId })
+                ])
+                return { status: 200, message: 'Группа удалена, так как остался один участник' };
+            }
+
+            const userNick = await User.findById(userId).select('nickname').lean();
+
+            await this.createMessage(
+                userId, undefined, "leave_group", undefined, convId, undefined, 'group',
+                'system', `sender:${userNick.nickname}`
+            );
+
+            await groupConv.updateOne(
+                { _id: convId },
+                { $pull: { members: { user_id: new mongoose.Types.ObjectId(userId) } } }
+            );
+
+            return { status: 200, message: 'Вы успешно вышли из группы' };
+        } catch (err) {
+            console.error("Ошибка при выходе из группы:", err.message);
+            throw new Error("Ошибка при выходе из группы");
+        }
+    }
+
+    async getConversationMedia(requester, convId, mode, page = 1, limit = 50) {
+        const invalidIds = this.checkIds(requester, convId);
+        if (invalidIds) return invalidIds;
+
+        try {
+            const conversationType = await this.checkDialog(requester, convId);
+            if (conversationType.error) {
+                return conversationType;
+            }
+
+            let fileFilter = {};
+            if (mode === 'image') {
+                fileFilter.client_file_type = { $regex: /^image\// };
+            } else if (mode === 'video') {
+                fileFilter.client_file_type = { $regex: /^video\// };
+            } else if (mode === 'files') {
+                fileFilter.client_file_type = { $not: { $regex: /^(image|video)\// } };
+            }
+
+            const media = await Media.aggregate([
+                {
+                    $match: {
+                        conversation_id: new mongoose.Types.ObjectId(convId),
+                        conversation_model: conversationType,
+                        ...fileFilter
+                    }
+                },
+                { $sort: { createdAt: -1 } },
+                { $skip: (page - 1) * limit },
+                { $limit: limit + 1 },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "user_id",
+                        foreignField: "_id",
+                        as: "user_info"
+                    }
+                },
+                { $unwind: "$user_info" },
+                {
+                    $lookup: {
+                        from: "avatars",
+                        localField: "user_id",
+                        foreignField: "user_id",
+                        as: "avatar"
+                    }
+                },
+                {
+                    $addFields: {
+                        sender: {
+                            _id: "$user_info._id",
+                            nickname: "$user_info.nickname",
+                            nickname_color: "$user_info.nickname_color",
+                            avatar: { $arrayElemAt: ["$avatar.asset_url", 0] }
+                        }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        conversation_id: 1,
+                        client_filename: 1,
+                        client_file_size: 1,
+                        store_url: 1,
+                        createdAt: 1,
+                        sender: 1
+                    }
+                }
+            ]);
+
+
+            const hasMore = media.length > limit;
+            if (hasMore) media.pop();
+
+            return { media, hasMore };
+        } catch (err) {
+            console.error("Ошибка при получении медиа файлов из диалога:", err.message);
+            throw new Error("Ошибка при получении медиа файлов из диалога");
+        }
+    }
+
+
 
 
 
