@@ -1323,6 +1323,22 @@ class smService {
         }
     }
 
+    async validateGroupAccess(userId, convId) {
+        const conversation = await this.getConversationWithMembers(convId);
+        if (conversation.error) return conversation;
+
+        const requesterMember = this.getMemberInfo(conversation, userId);
+        if (!requesterMember) {
+            return { error: '400', status: 400, message: 'Вы не состоите в группе' };
+        }
+
+        if (requesterMember.role !== "admin" && requesterMember.role !== "owner") {
+            return { error: '403', status: 403, message: 'Нет прав для выполнения этого действия' };
+        }
+
+        return { conversation, requesterMember };
+    }
+
     async getConversationMedia(requester, convId, mode, page = 1, limit = 50) {
         const invalidIds = this.checkIds(requester, convId);
         if (invalidIds) return invalidIds;
@@ -1405,6 +1421,191 @@ class smService {
     }
 
 
+    async getFriendsForGroup(requester, convId, q, page = 1, limit = 10) {
+        const invalidIds = this.checkIds(requester, convId);
+        if (invalidIds) return invalidIds;
+
+        try {
+            const conversation = await this.getConversationWithMembers(convId);
+            if (conversation.error) return conversation;
+
+            const requesterMember = this.getMemberInfo(conversation, requester);
+            if (!requesterMember) return { error: '400', status: 400, message: 'Вы не состоите в группе' };
+
+            if (requesterMember.role !== "admin" && requesterMember.role !== "owner") {
+                return { error: '403', status: 403, message: 'Нет прав для добавления участников' };
+            }
+
+            const groupMemberIds = new Set(conversation.members.map(m => m.user_id));
+
+            const friends = await Friend.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { user1_id: new mongoose.Types.ObjectId(requester) },
+                            { user2_id: new mongoose.Types.ObjectId(requester) }
+                        ]
+                    }
+                },
+                {
+                    $project: {
+                        friendId: {
+                            $cond: {
+                                if: { $eq: ["$user1_id", new mongoose.Types.ObjectId(requester)] },
+                                then: "$user2_id",
+                                else: "$user1_id"
+                            }
+                        }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "friendId",
+                        foreignField: "_id",
+                        as: "userInfo"
+                    }
+                },
+                { $unwind: "$userInfo" },
+                ...(q ? [{ $match: { "userInfo.nickname": { $regex: q, $options: "i" } } }] : []),
+                {
+                    $lookup: {
+                        from: "avatars",
+                        localField: "friendId",
+                        foreignField: "user_id",
+                        as: "avatar"
+                    }
+                },
+                { $unwind: { path: "$avatar", preserveNullAndEmptyArrays: true } },
+                {
+                    $match: {
+                        "userInfo._id": { $nin: [...groupMemberIds] }
+                    }
+                },
+                { $skip: (page - 1) * limit },
+                { $limit: limit + 1 },
+                {
+                    $project: {
+                        _id: 0,
+                        user_id: "$userInfo._id",
+                        nickname: "$userInfo.nickname",
+                        nickname_color: "$userInfo.nickname_color",
+                        avatar: "$avatar.asset_url"
+                    }
+                }
+            ]);
+
+            const hasMore = friends.length > limit;
+            if (hasMore) friends.pop();
+
+            return { friends, hasMore };
+        } catch (err) {
+            console.error("Ошибка при получении друзей для группы:", err);
+            throw new Error("Ошибка при получении друзей для группы");
+        }
+    }
+
+
+    async addGroupMembers(requester, convId, members) {
+        const invalidIds = this.checkIds(requester, convId, ...members);
+        if (invalidIds) return invalidIds;
+
+        try {
+            const accessCheck = await this.validateGroupAccess(requester, convId);
+            if (accessCheck.error) return accessCheck;
+
+            const { conversation } = accessCheck;
+
+            const existingMemberIds = conversation.members.map(member => member.user_id.toString());
+
+            const newMembers = members.filter(memberId => !existingMemberIds.includes(memberId));
+
+            if (!newMembers.length) {
+                return { error: '400', status: 400, message: 'Все указанные пользователи уже состоят в группе' };
+            }
+
+            const newMemberObjects = newMembers.map(userId => ({
+                user_id: new mongoose.Types.ObjectId(userId),
+                role: "member"
+            }));
+
+            await groupConv.updateOne(
+                { _id: convId },
+                { $push: { members: { $each: newMemberObjects } } }
+            );
+
+            const addedUsers = await User.find({ _id: { $in: newMembers } })
+                .select("nickname")
+                .limit(3)
+                .lean();
+
+            const addedNicknames = addedUsers.map(user => user.nickname);
+
+            await this.createMessage(
+                requester, undefined, "add_members", undefined, convId, undefined, 'group',
+                'system', `added_users:${newMembers.length > 3 ? `${addedNicknames.join(", ")} ...` : addedNicknames.join(", ")}`
+            );
+
+            return { status: 200, message: `Пользователи успешно добавлены в группу` };
+        } catch (err) {
+            console.error("Ошибка при добавлении новых участников в группу:", err);
+            throw new Error("Ошибка при добавлении новых участников в группу");
+        }
+    }
+
+    async getGroupMemberInfo(userId, convId) {
+        const invalidIds = this.checkIds(userId, convId);
+        if (invalidIds) return invalidIds;
+
+        try {
+            const conversation = await this.getConversationWithMembers(convId);
+            if (conversation.error) return conversation;
+
+            const memberInfo = this.getMemberInfo(conversation, userId);
+            if (!memberInfo) {
+                return { error: '404', status: 404, message: 'Вы не состоите в данной группе' };
+            }
+
+            return {
+                user_id: memberInfo.user_id,
+                role: memberInfo.role
+            };
+        } catch (err) {
+            console.error("Ошибка при получении информации о себе в группе:", err);
+            throw new Error("Ошибка при получении информации о себе в группе");
+        }
+    }
+
+    async changeGroupTitle(requester, convId, newTitle) {
+        const invalidIds = this.checkIds(requester, convId);
+        if (invalidIds) return invalidIds;
+
+        try {
+            const accessCheck = await this.validateGroupAccess(requester, convId);
+            if (accessCheck.error) return accessCheck;
+
+            const { conversation, requesterMember } = accessCheck;
+
+            if (!["owner", "admin"].includes(requesterMember.role)) {
+                return { error: '400', status: 400, message: 'Только админ или владелец могут менять название группы' };
+            }
+
+            await groupConv.updateOne(
+                { _id: convId },
+                { $set: { title: newTitle.trim() } }
+            );
+
+            await this.createMessage(
+                requester, undefined, "change_title", undefined, convId, undefined, 'group',
+                'system', `new_title^&^${newTitle.trim()}`
+            );
+
+            return { status: 200, message: `Название группы изменено на "${newTitle.trim()}"` };
+        } catch (err) {
+            console.error("Ошибка при изменении названия групы:", err);
+            throw new Error("Ошибка при изменении названия групы");
+        }
+    }
 
 
 

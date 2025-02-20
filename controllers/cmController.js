@@ -1,5 +1,6 @@
 const cmService = require("../services/cmService");
 const formidable = require("formidable");
+const userService = require("../services/userService");
 
 class cmController {
     async createMessage(req, res) {
@@ -170,6 +171,25 @@ class cmController {
         }
     }
 
+    async getGroupConvMe(req, res) {
+        const {id} = req.params;
+
+        if (!id) return res.status(400).json({error: "Нехватает данных или данные некорректны"});
+
+        try {
+            const result = await cmService.getGroupMemberInfo(req.user.uid, id);
+
+            if (result.error) {
+                return res.status(result.status).json({ error: result.message });
+            }
+
+            return res.status(200).json({...result});
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({error: "Ошибка при получении информации о себе в группе"});
+        }
+    }
+
     async updateMemberGroupRole(req, res) {
         const { id: convId } = req.params;
         const { targetMember, role } = req.body;
@@ -247,6 +267,72 @@ class cmController {
         } catch (err) {
             console.error("Ошибка при получении медиа из диалога:", err);
             return res.status(500).json({ error: "Ошибка при получении медиа из диалога" });
+        }
+    }
+
+    async getGroupFriends(req, res) {
+        const { id: convId } = req.params;
+        const { q, page = 1, limit = 10 } = req.query;
+
+        if (!convId) {
+            return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+        }
+
+        try {
+            const friendsSnap = await cmService.getFriendsForGroup(req.user.uid, convId, q, +page, +limit);
+
+            if (friendsSnap.error) {
+                return res.status(400).json(friendsSnap);
+            }
+
+            return res.status(200).json({...friendsSnap});
+        } catch (err) {
+            console.error("Ошибка при получении друзей для группы:", err);
+            return res.status(500).json({ error: "Ошибка при получении друзей для группы" });
+        }
+    }
+
+    async addNewGroupMembers(req, res) {
+        const { id: convId } = req.params;
+        const { members } = req.body;
+
+        if (!members || !members.length) {
+            return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+        }
+
+        try {
+            const membersSnap = await cmService.addGroupMembers(req.user.uid, convId, members);
+
+            if (membersSnap.error) {
+                return res.status(400).json(membersSnap);
+            }
+
+            return res.status(200).json({message: membersSnap.message});
+        } catch (err) {
+            console.error("Ошибка при добавлении новых участников в группу:", err);
+            return res.status(500).json({ error: "Ошибка при новых участников в группу" });
+        }
+    }
+
+    async changeGroupTitle(req, res) {
+        const { id: convId } = req.params;
+        const { newTitle } = req.body;
+
+        if (!newTitle || !newTitle.length || typeof newTitle !== 'string') {
+            return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+        }
+
+        try {
+            const result = await cmService.changeGroupTitle(req.user.uid, convId, newTitle);
+
+            if (result.error) {
+                return res.status(400).json({message: result.message});
+            }
+
+            return res.status(200).json({message: result.message});
+        } catch (err) {
+            console.error("Ошибка при изменении названия групы:", err);
+            return res.status(500).json({ error: "Ошибка при изменении названия групы" });
         }
     }
 
