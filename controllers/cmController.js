@@ -336,6 +336,28 @@ class cmController {
         }
     }
 
+    async changeGroupCover(req, res) {
+        const { id: convId } = req.params;
+        const { newCover } = req.body;
+
+        if (!newCover || !newCover.match(/^data:(.+);base64,(.+)$/)) {
+            return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+        }
+
+        try {
+            const result = await cmService.changeGroupCover(req.user.uid, convId, newCover);
+
+            if (result.error) {
+                return res.status(result.status).json({ error: result.message });
+            }
+
+            return res.status(200).json({message: "Аватар успешно обновлен", cover_url: result.cover_url, cover_id: result.cover_id});
+        } catch (err) {
+            console.error("Ошибка при изменении аватара групы:", err);
+            return res.status(500).json({ error: "Ошибка при изменении аватара групы" });
+        }
+    }
+
 }
 
 module.exports = new cmController();

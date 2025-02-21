@@ -1607,7 +1607,49 @@ class smService {
         }
     }
 
+    async changeGroupCover(requester, convId, newCover) {
+        const invalidIds = this.checkIds(requester, convId);
+        if (invalidIds) return invalidIds;
 
+        try {
+            const accessCheck = await this.validateGroupAccess(requester, convId);
+            if (accessCheck.error) return accessCheck;
+
+            const { conversation, requesterMember } = accessCheck;
+
+            if (!["owner", "admin"].includes(requesterMember.role)) {
+                return { error: '400', status: 400, message: 'Только админ или владелец могут менять аватар группы' };
+            }
+
+            const [uploadedCover] = await Promise.all([
+                MediaService.uploadBase64ToS3(newCover, requester),
+                MediaService.deleteMedia(conversation.cover_id)
+            ])
+
+            const mediaRecord = await MediaService.createMedia(
+                requester,
+                uploadedCover.client_filename,
+                uploadedCover.client_file_type,
+                uploadedCover.client_file_size,
+                uploadedCover.store_filename,
+                uploadedCover.store_url
+            );
+
+            conversation.cover_id = mediaRecord._id;
+            conversation.cover_url = mediaRecord.store_url;
+            await conversation.save();
+
+            await this.createMessage(
+                requester, undefined, "change_cover", undefined, convId, undefined, 'group',
+                'system', `new_title^&^${mediaRecord.store_url}`
+            );
+
+            return { cover_id: mediaRecord._id, cover_url: mediaRecord.store_url };
+        } catch (err) {
+            console.error("Ошибка при изменении аватара групы:", err);
+            throw new Error("Ошибка при изменении аватара групы");
+        }
+    }
 
 }
 

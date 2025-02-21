@@ -193,6 +193,22 @@ class MediaService {
         }
     }
 
+    async deleteMedia(mediaId) {
+        try {
+            const media = await Media.findById(mediaId);
+
+            await s3Client.send(new DeleteObjectCommand({
+                Bucket: 'talkmap-multimedia-storage',
+                Key: `${media.user_id}/${media.store_filename}`,
+            }));
+
+            await Media.deleteOne({_id: media._id});
+        } catch (err) {
+            console.error("Ошибка при удалении медиа:", err);
+            throw err;
+        }
+    }
+
     async getPhotoById(photoId, uid) {
         if (!mongoose.Types.ObjectId.isValid(uid) || !mongoose.Types.ObjectId.isValid(photoId)) return null;
 
