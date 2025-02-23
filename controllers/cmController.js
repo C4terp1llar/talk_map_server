@@ -358,6 +358,29 @@ class cmController {
         }
     }
 
+    async deleteMessage(req, res) {
+        const { msgId } = req.params;
+        const { convId } = req.query;
+
+        if (!msgId || !convId) {
+            return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+        }
+
+        try {
+            const result = await cmService.deleteMessage(req.user.uid, convId, msgId);
+
+            if (result.error) {
+                return res.status(result.status).json({ error: result.message });
+            }
+
+            return res.status(200).json({ message: result.message });
+        } catch (err) {
+            console.error("Ошибка при удалении сообщения:", err);
+            return res.status(500).json({ error: "Ошибка при удалении сообщения" });
+        }
+    }
+
+
 }
 
 module.exports = new cmController();

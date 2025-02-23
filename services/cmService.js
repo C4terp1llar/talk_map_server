@@ -1651,6 +1651,75 @@ class smService {
         }
     }
 
+    async deleteMessage(requester, convId, msgId) {
+        const invalidIds = this.checkIds(requester, convId, msgId);
+        if (invalidIds) return invalidIds;
+
+        try {
+            const dialogType = await this.checkDialog(requester, convId);
+
+            if (dialogType.error) {
+                return dialogType;
+            }
+
+            const message = await Message.findOne({ _id: msgId, conversation_id: convId });
+
+            if (!message) {
+                return { error: '404', status: 404, message: 'Сообщение не найдено' };
+            }
+
+            if (String(message.user_id) !== String(requester) || message.messageType === 'system') {
+                return { error: '403', status: 403, message: 'Вы не можете удалить это сообщение' };
+            }
+
+            const conversationModel = dialogType === "PersonalConversation" ? personalConv : groupConv;
+            const conversation = await conversationModel.findById(convId);
+
+            if (String(message._id) === String(conversation.lastMessage)) {
+                const prevMessage = await Message.findOne({
+                    conversation_id: convId,
+                    createdAt: { $lt: message.createdAt },
+                    isDeleted: { $ne: true }
+                }).sort({ createdAt: -1 });
+
+                if (!prevMessage) {
+                    await Promise.all([
+                        Message.deleteMany({ conversation_id: convId }),
+                        conversationModel.findByIdAndDelete(convId)
+                    ]);
+                } else {
+                    await conversationModel.findByIdAndUpdate(convId, { lastMessage: prevMessage._id });
+                }
+            }
+
+            if (message.media && message.media.length > 0) {
+                await Promise.all(
+                    message.media.map(async (mediaId) => {
+                        await MediaService.deleteMedia(mediaId);
+                    })
+                );
+            }
+
+            await Message.findByIdAndUpdate(msgId, {
+                isDeleted: true,
+                content: 'Сообщение удалено'
+            });
+
+            return { message: 'Сообщение успешно удалено' };
+        } catch (err) {
+            console.error("Ошибка при удалении сообщения:", err);
+            throw new Error("Ошибка при удалении сообщения");
+        }
+    }
+
+
+
+
+
+
+
+
+
 }
 
 module.exports = new smService();
