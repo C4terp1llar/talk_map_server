@@ -1712,9 +1712,59 @@ class smService {
         }
     }
 
+    async changeMessage(requester, convId, content, msgId, files) {
+        const invalidIds = this.checkIds(requester, convId, msgId);
+        if (invalidIds) return invalidIds;
 
+        try {
+            const dialogType = await this.checkDialog(requester, convId);
+            if (dialogType.error) {
+                return dialogType;
+            }
 
+            const message = await Message.findOne({ _id: msgId, conversation_id: convId });
 
+            if (!message) {
+                return { error: '404', status: 404, message: 'Сообщение не найдено в этом диалоге' };
+            }
+
+            if (String(message.user_id) !== String(requester) || message.messageType === 'system') {
+                return { error: '403', status: 403, message: 'Вы не можете изменить это сообщение' }
+            }
+
+            let deletePromises = [];
+            if (message.media && message.media.length > 0 && files && Object.keys(files).length > 0) {
+                deletePromises = message.media.map(media => MediaService.deleteMedia(media._id));
+            }
+
+            let uploadPromise = Promise.resolve();
+            let media = [];
+
+            if (files && Object.keys(files).length > 0) {
+                uploadPromise = uploadMedia(requester, files, convId, dialogType).then(uploadedMedia => {
+                    media = uploadedMedia;
+                }).catch(uploadError => {
+                    throw uploadError;
+                });
+            }
+
+            await Promise.all([
+                ...deletePromises,
+                uploadPromise
+            ]);
+
+            message.content = content || message.content;
+            message.media = media.length > 0 ? media : message.media;
+            message.isEdited = true;
+
+            const updatedMessage = await message.save();
+
+            return { success: true, data: updatedMessage };
+        } catch (err) {
+            console.error("Ошибка при изменении сообщения:", err);
+            throw err;
+        }
+    }
 
 
 

@@ -60,6 +60,7 @@ router.post('/reaction', authMiddleware, mediaController.reactionAction);
 
 router.post('/message', authMiddleware, cmController.createMessage);
 router.get('/message', authMiddleware, cmController.getConversationMessages);
+router.put('/message/:msgId', authMiddleware, cmController.changeMessage);
 router.delete('/message/:msgId', authMiddleware, cmController.deleteMessage);
 
 router.get('/group/check', authMiddleware, cmController.checkGroup);

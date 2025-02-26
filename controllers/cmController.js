@@ -380,6 +380,46 @@ class cmController {
         }
     }
 
+    async changeMessage(req, res) {
+        const { msgId } = req.params;
+
+        if (!msgId) {
+            return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+        }
+
+        const form = new formidable.IncomingForm({
+            multiples: true,
+            uploadDir: "./uploads",
+            keepExtensions: true,
+        });
+
+        try {
+            const {fields, files} = await new Promise((resolve, reject) => {
+                form.parse(req, (err, fields, files) => {
+                    if (err) return reject(err);
+                    resolve({fields, files});
+                });
+            });
+
+            const content = fields.content && fields.content[0] ? fields.content[0] : null;
+            const convId = fields.convId && fields.convId[0] ? fields.convId[0] : null;
+
+            if ((!content && !files) || !convId || !msgId) {
+                return res.status(400).json({error: "Нехватает данных или данные некорректны"});
+            }
+
+            const result = await cmService.changeMessage(req.user.uid, convId, content, msgId, files);
+
+            if (result.error) {
+                return res.status(result.status).json({ error: result.message });
+            }
+
+            return res.status(200).json({message: result.data});
+        } catch (err) {
+            console.error("Ошибка при изменении сообщения:", err.message);
+            return res.status(500).json({error: "Ошибка при изменении сообщения"});
+        }
+    }
 
 }
 
