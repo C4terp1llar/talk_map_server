@@ -1,6 +1,8 @@
 const cmService = require("../services/cmService");
 const formidable = require("formidable");
 const userService = require("../services/userService");
+const asyncTaskRunner = require('../utils/asyncTaskRunner')
+const wsServer = require("../utils/wsServer");
 
 class cmController {
     async createMessage(req, res) {
@@ -31,6 +33,10 @@ class cmController {
             }
 
             const createdMessage = await cmService.createMessage(requester, recipient, content, files, convId, replyTo, chatType);
+
+            asyncTaskRunner(async () => {
+                wsServer.emitToUser(await cmService.getConvMembersIds(req.user.uid, createdMessage?.conversation_id), `receive_msg`, {createdMessage})
+            })
 
             return res.status(201).json({message: createdMessage});
         } catch (err) {

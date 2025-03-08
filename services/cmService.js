@@ -856,6 +856,22 @@ class smService {
                     }
                 },
                 {
+                    $lookup: {
+                        from: "messages",
+                        localField: "replyTo",
+                        foreignField: "_id",
+                        as: "replyMessage"
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "replyMessage.user_id",
+                        foreignField: "_id",
+                        as: "replyUserInfo"
+                    }
+                },
+                {
                     $addFields: {
                         sender: {
                             _id: "$user_id",
@@ -883,6 +899,26 @@ class smService {
                                 }
                             }
                         },
+                        replyMessage: {
+                            $cond: {
+                                if: {$gt: [{$size: "$replyMessage"}, 0]},
+                                then: {
+                                    _id: {$arrayElemAt: ["$replyMessage._id", 0]},
+                                    user_id: {$arrayElemAt: ["$replyMessage.user_id", 0]},
+                                    content: {$arrayElemAt: ["$replyMessage.content", 0]},
+                                    mediaCount: {$size: { $ifNull: [{ $arrayElemAt: ["$replyMessage.media", 0] }, []] }},
+                                    isEdited: { $arrayElemAt: ["$replyMessage.isEdited", 0] },
+                                    createdAt: { $arrayElemAt: ["$replyMessage.createdAt", 0] },
+                                    updatedAt: { $arrayElemAt: ["$replyMessage.updatedAt", 0] },
+                                    sender: {
+                                        _id: { $arrayElemAt: ["$replyUserInfo._id", 0] },
+                                        nickname: { $arrayElemAt: ["$replyUserInfo.nickname", 0] },
+                                        nickname_color: { $arrayElemAt: ["$replyUserInfo.nickname_color", 0] }
+                                    }
+                                },
+                                else: null
+                            }
+                        }
                     }
                 },
                 {
@@ -894,6 +930,7 @@ class smService {
                         replyTo: 1,
                         messageType: 1,
                         additionalInfo: 1,
+                        replyMessage: 1,
                         isEdited: 1,
                         isDeleted: 1,
                         isForwarded: 1,
@@ -1766,7 +1803,40 @@ class smService {
         }
     }
 
+    async getConvMembersIds(requester, convId) {
+        const invalidIds = this.checkIds(requester, convId);
+        if (invalidIds) return invalidIds;
 
+        try {
+            const dialogType = await this.checkDialog(requester, convId);
+            if (dialogType.error) {
+                return dialogType;
+            }
+
+            let userIds = [];
+
+            if (dialogType === "PersonalConversation") {
+                const personalConversation = await personalConv.findById(convId);
+                if (personalConversation) {
+                    userIds = [
+                        personalConversation.user1_id.toString() === requester.toString() ? personalConversation.user2_id : personalConversation.user1_id
+                    ];
+                }
+            } else if (dialogType === "GroupConversation") {
+                const groupConversation = await groupConv.findById(convId);
+                if (groupConversation) {
+                    userIds = groupConversation.members
+                        .filter(member => member.user_id.toString() !== requester.toString())
+                        .map(member => member.user_id.toString());
+                }
+            }
+
+            return userIds;
+        } catch (err) {
+            console.error("Ошибка при получении участников диалога:", err);
+            throw err;
+        }
+    }
 
 
 
