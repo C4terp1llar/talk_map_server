@@ -427,6 +427,24 @@ class cmController {
         }
     }
 
+    async markReadMessages(req, res) {
+        const { messages } = req.body;
+        const { id: convId } = req.params;
+
+        if (!convId || !messages || !messages.length) return res.status(400).json({ error: "Нехватает данных или данные некорректны" });
+
+        try {
+            const result = await cmService.readMessages(req.user.uid, convId, messages);
+            if (result.error) {
+                return res.status(result.status).json({ error: result.message });
+            }
+            return res.status(200).json({message: result.message});
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Ошибка при пометке сообщений прочитанными" });
+        }
+    }
+
 }
 
 module.exports = new cmController();

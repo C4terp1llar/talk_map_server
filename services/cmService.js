@@ -1838,7 +1838,53 @@ class smService {
         }
     }
 
+    async readMessages(requester, convId, messages) {
+        const invalidIds = this.checkIds(requester, ...messages);
+        if (invalidIds) return invalidIds;
 
+        const conversationType = await this.checkDialog(requester, convId);
+        if (conversationType.error) {
+            return { error: conversationType.error, status: 400, message: conversationType.message };
+        }
+
+        try {
+            const updates = messages.map(async (messageId) => {
+                const message = await Message.findById(messageId);
+                if (!message) {
+                    return { error: "404", status: 404, message: `Сообщение с ID ${messageId} не найдено.` };
+                }
+
+                if (message.user_id.toString() === requester.toString()) {
+                    return { error: "400", status: 400, message: `Нельзя отметить свои собственные сообщения.` };
+                }
+
+                // Плюс маленькая проверка — сообщение должно быть из того же диалога
+                if (message.conversation_id.toString() !== convId.toString()) {
+                    return { error: "400", status: 400, message: `Сообщение не принадлежит этому диалогу.` };
+                }
+
+                const existingRead = message.isRead.find(r => r.user_id.toString() === requester.toString());
+                if (existingRead) {
+                    existingRead.read = true;
+                } else {
+                    message.isRead.push({ user_id: requester, read: true });
+                }
+
+                await message.save();
+
+                asyncTaskRunner(async () => {
+                    wsServer.emitToUser(message.user_id, `read_msg`, messageId);
+                });
+            });
+
+            await Promise.all(updates);
+
+            return { message: "сообщения успешно отмечены прочитанными" };
+        } catch (err) {
+            console.error("Ошибка при отметке сообщений прочитанными:", err);
+            throw err;
+        }
+    }
 
 }
 

@@ -81,5 +81,7 @@ router.get('/conv/new/:uid', authMiddleware, cmController.getNewConvOpponent);
 router.get('/conv/:id/new/members', authMiddleware, cmController.getGroupFriends);
 router.post('/conv/:id/new/members', authMiddleware, cmController.addNewGroupMembers);
 
+router.post('/conv/:id/msgRead', authMiddleware, cmController.markReadMessages);
+
 
 module.exports = router;
