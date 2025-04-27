@@ -153,6 +153,14 @@ class AuthController {
         }
     }
 
+    async ping(req, res) {
+        try {
+            res.status(200).json({message: 'pong'})
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Ошибка' });
+        }
+    }
 }
 
 module.exports = new AuthController();
